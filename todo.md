@@ -326,8 +326,8 @@ Use this section for brainstorming and tracking ideas:
 
 ## Metadata
 
-*Last Updated: 2026-02-12*
-*Template Version: 3.0*
+*Last Updated: 2026-08-24*
+*Template Version: 3.1*
 *Applicable to: Any programming language/framework*
 
 **Customization Notes:**

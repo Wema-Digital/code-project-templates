@@ -644,8 +644,8 @@ This template is provided as-is for anyone to use freely. Adapt it to your needs
 
 Created for the developer community to accelerate project development with Claude Code.
 
-**Template Version**: 3.0
-**Last Updated**: 2026-02-12
+**Template Version**: 3.1
+**Last Updated**: 2026-08-24
 **Maintained by**: wema.digital
 
 ---

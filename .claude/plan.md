@@ -1,3 +1,5 @@
+> **Status**: Executed 2026-02-12. Reviewed and updated 2026-08-24 (dates bumped to v3.1, CLAUDE.md added). Superseded by root `claude/` planning documents for future changes.
+
 Context
 This project is meant to be a general-purpose, language-agnostic starter template that any new user can quickly use to start developing projects with Claude Code. Currently, the todo.md file is heavily focused on SQL database projects, which is too specific for a general template. The README is also minimal and doesn't provide guidance on how to use this template effectively with Claude Code.
 Goals:
