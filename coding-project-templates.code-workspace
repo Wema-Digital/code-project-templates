@@ -1,5 +1,8 @@
 {
     "folders": [
+	{
+            "path": "."
+        },
         {
             "path": ".git"
         },
@@ -14,10 +17,12 @@
         },
         {
             "path": "features"
+        },        
+        {
+            "path": "claude"
         }
     ],
-    // // Controls the settings that apply to all profiles
-"settings": {
+    "settings": {
         "terminal.integrated.env.windows": {
             "PATH": "${env:anaconda_environment};"
         },
@@ -82,8 +87,7 @@
             ]
         }
     },
-    // // Add debugging configurations to project
-"launch": {
+    "launch": {
         "configurations": [
             {
                 "name": "Python: Module: coding-project-templates",
@@ -97,8 +101,7 @@
             }
         ]
     },
-    // // Automate project tasks
-"tasks": {
+    "tasks": {
         "version": "2.0.0",
         "tasks": [
             {
