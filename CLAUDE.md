@@ -1,38 +1,48 @@
-# CLAUDE.md — claude-code-basic
+# CLAUDE.md — manuals
 
-This is the **base template** of the `coding-project-templates` library. It lives on branch `claude-code-b` and is checked out as a git worktree at `features/claude-code-basic` within the root repo.
+This is the **documentation site template** of the `coding-project-templates` library. It lives on branch `manus` and is checked out as a git worktree at `features/manuals` within the root repo.
 
 ## Role of this template
 
-`claude-code-basic` is the language-agnostic foundation that every other template is built on. When this template changes, improvements are propagated to the other 9 template branches via `git merge claude-code-b` (Phase 4 of the project plan).
+`manuals` provides a starter scaffold for project documentation sites. It extends the language-agnostic base (`claude-code-basic`, branch `claude-code-b`) with a docs-site structure and tooling for writing, building, and publishing technical documentation.
 
-Keep it generic and universally applicable — no language-specific code or dependencies belong here.
+## Stack
+
+- **Docs framework**: MkDocs + Material theme
+- **Language**: Python (MkDocs is Python-based)
+- **Hosting**: GitHub Pages (via CI)
+- **CI**: GitHub Actions — build and deploy on push to `manus`
 
 ## What this template contains
 
 | File | Purpose |
 |---|---|
-| `todo.md` | Language-agnostic task tracking template with the full symbol system |
-| `README.md` | Guide to using this template with Claude Code |
-| `requirements.txt` | Example Python dependencies with comments for other languages |
-| `.claude/plan.md` | Original plan that produced the current files (executed 2026-02-12, updated 2026-08-24) |
+| `todo.md` | Language-agnostic task tracking template (from base) |
+| `README.md` | Guide to using this template with Claude Code (from base) |
+| `requirements.txt` | Python deps example — extend with mkdocs + theme |
+| `.claude/plan.md` | Base template plan (for reference) |
+| `CLAUDE.md` | This file |
+
+**Planned additions (Phase 5):**
+- `mkdocs.yml` — site configuration
+- `docs/index.md` — home page skeleton
+- `docs/getting-started.md` — starter page
+- `requirements.txt` — updated with `mkdocs`, `mkdocs-material`
+- `.github/workflows/deploy-docs.yml` — build + deploy to GitHub Pages
 
 ## Repo conventions (from root CLAUDE.md)
 
-- **Commits** on this branch: `phase 3 base template: <what changed>` or `feat: <what changed>`
-- **Push** to `origin claude-code-b` from inside this worktree
+- **Commits** on this branch: `phase 5 intermediate: <what changed>` or `docs: <what changed>`
+- **Push** to `origin manus` from inside this worktree
 - **Planning notes** live in the root repo's `claude/` folder (numbered `N-Title.md`), not here
 - **GitHub Project**: [Wema-Digital/projects/2](https://github.com/orgs/Wema-Digital/projects/2) — mark tasks Done after committing
 
-## Propagation note
+## Receiving base updates
 
-After changes here are committed and pushed, Phase 4 merges them into each sibling template:
+When `claude-code-basic` is updated, merge changes into this branch:
 
 ```bash
-# Example: propagate to web-flask
-cd features/web-flask     # branch py-flask
+cd features/manuals   # branch manus
 git merge claude-code-b
-git push origin py-flask
+git push origin manus
 ```
-
-Run this for all 9 sibling branches (see the Phase 4 tasks on the project board).
