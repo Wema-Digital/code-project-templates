@@ -1,38 +1,51 @@
-# CLAUDE.md — claude-code-basic
+# CLAUDE.md — python-app
 
-This is the **base template** of the `coding-project-templates` library. It lives on branch `claude-code-b` and is checked out as a git worktree at `features/claude-code-basic` within the root repo.
+This is the **Python application template** of the `coding-project-templates` library. It lives on branch `py-app` and is checked out as a git worktree at `features/python-app` within the root repo.
 
 ## Role of this template
 
-`claude-code-basic` is the language-agnostic foundation that every other template is built on. When this template changes, improvements are propagated to the other 9 template branches via `git merge claude-code-b` (Phase 4 of the project plan).
+`python-app` provides a starter scaffold for general-purpose Python applications with a clean entrypoint, configuration management, and test suite. It extends the language-agnostic base (`claude-code-basic`, branch `claude-code-b`) with Python-specific structure and tooling.
 
-Keep it generic and universally applicable — no language-specific code or dependencies belong here.
+## Stack
+
+- **Language**: Python
+- **Entry point**: `src/main.py`
+- **Config**: `python-dotenv` (`.env` files)
+- **Testing**: pytest
+- **Linting**: Ruff (or Pylint)
+- **CI**: GitHub Actions
 
 ## What this template contains
 
 | File | Purpose |
 |---|---|
-| `todo.md` | Language-agnostic task tracking template with the full symbol system |
-| `README.md` | Guide to using this template with Claude Code |
-| `requirements.txt` | Example Python dependencies with comments for other languages |
-| `.claude/plan.md` | Original plan that produced the current files (executed 2026-02-12, updated 2026-08-24) |
+| `todo.md` | Language-agnostic task tracking template (from base) |
+| `README.md` | Guide to using this template with Claude Code (from base) |
+| `requirements.txt` | Python deps example — extend with app-specific packages |
+| `.claude/plan.md` | Base template plan (for reference) |
+| `CLAUDE.md` | This file |
+
+**Planned additions (Phase 5):**
+- `src/__init__.py` + `src/main.py` — application entrypoint
+- `src/config.py` — environment/config loader
+- `tests/test_main.py` — pytest scaffold with one passing test
+- `.env.example`
+- `pyproject.toml` — project metadata + tool config
+- `.github/workflows/test.yml` — CI on push
 
 ## Repo conventions (from root CLAUDE.md)
 
-- **Commits** on this branch: `phase 3 base template: <what changed>` or `feat: <what changed>`
-- **Push** to `origin claude-code-b` from inside this worktree
+- **Commits** on this branch: `phase 5 intermediate: <what changed>` or `feat: <what changed>`
+- **Push** to `origin py-app` from inside this worktree
 - **Planning notes** live in the root repo's `claude/` folder (numbered `N-Title.md`), not here
 - **GitHub Project**: [Wema-Digital/projects/2](https://github.com/orgs/Wema-Digital/projects/2) — mark tasks Done after committing
 
-## Propagation note
+## Receiving base updates
 
-After changes here are committed and pushed, Phase 4 merges them into each sibling template:
+When `claude-code-basic` is updated, merge changes into this branch:
 
 ```bash
-# Example: propagate to web-flask
-cd features/web-flask     # branch py-flask
+cd features/python-app   # branch py-app
 git merge claude-code-b
-git push origin py-flask
+git push origin py-app
 ```
-
-Run this for all 9 sibling branches (see the Phase 4 tasks on the project board).
