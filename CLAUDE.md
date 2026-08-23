@@ -1,38 +1,51 @@
-# CLAUDE.md — claude-code-basic
+# CLAUDE.md — machine-learning
 
-This is the **base template** of the `coding-project-templates` library. It lives on branch `claude-code-b` and is checked out as a git worktree at `features/claude-code-basic` within the root repo.
+This is the **Python Machine Learning template** of the `coding-project-templates` library. It lives on branch `py-ml` and is checked out as a git worktree at `features/machine-learning` within the root repo.
 
 ## Role of this template
 
-`claude-code-basic` is the language-agnostic foundation that every other template is built on. When this template changes, improvements are propagated to the other 9 template branches via `git merge claude-code-b` (Phase 4 of the project plan).
+`machine-learning` provides a starter scaffold for Python ML projects: data pipelines, model training, and experiment tracking. It extends the language-agnostic base (`claude-code-basic`, branch `claude-code-b`) with Python/ML-specific structure and dependencies.
 
-Keep it generic and universally applicable — no language-specific code or dependencies belong here.
+## Stack
+
+- **Language**: Python
+- **Core libs**: scikit-learn, pandas, numpy
+- **Experiment tracking**: (TBD — MLflow / simple logging)
+- **Testing**: pytest
+- **CI**: GitHub Actions
 
 ## What this template contains
 
 | File | Purpose |
 |---|---|
-| `todo.md` | Language-agnostic task tracking template with the full symbol system |
-| `README.md` | Guide to using this template with Claude Code |
-| `requirements.txt` | Example Python dependencies with comments for other languages |
-| `.claude/plan.md` | Original plan that produced the current files (executed 2026-02-12, updated 2026-08-24) |
+| `todo.md` | Language-agnostic task tracking template (from base) |
+| `README.md` | Guide to using this template with Claude Code (from base) |
+| `requirements.txt` | Python deps example — extend with ML-specific packages |
+| `.claude/plan.md` | Base template plan (for reference) |
+| `CLAUDE.md` | This file |
+
+**Planned additions (Phase 5):**
+- `requirements.txt` — updated with scikit-learn, numpy, matplotlib, jupyter
+- `src/pipeline.py` — data loading + preprocessing skeleton
+- `src/train.py` — model training entrypoint
+- `notebooks/exploration.ipynb` — starter notebook
+- `tests/` — pytest scaffold
+- `.env.example`
+- `.github/workflows/test.yml` — CI on push
 
 ## Repo conventions (from root CLAUDE.md)
 
-- **Commits** on this branch: `phase 3 base template: <what changed>` or `feat: <what changed>`
-- **Push** to `origin claude-code-b` from inside this worktree
+- **Commits** on this branch: `phase 5 intermediate: <what changed>` or `feat: <what changed>`
+- **Push** to `origin py-ml` from inside this worktree
 - **Planning notes** live in the root repo's `claude/` folder (numbered `N-Title.md`), not here
 - **GitHub Project**: [Wema-Digital/projects/2](https://github.com/orgs/Wema-Digital/projects/2) — mark tasks Done after committing
 
-## Propagation note
+## Receiving base updates
 
-After changes here are committed and pushed, Phase 4 merges them into each sibling template:
+When `claude-code-basic` is updated, merge changes into this branch:
 
 ```bash
-# Example: propagate to web-flask
-cd features/web-flask     # branch py-flask
+cd features/machine-learning   # branch py-ml
 git merge claude-code-b
-git push origin py-flask
+git push origin py-ml
 ```
-
-Run this for all 9 sibling branches (see the Phase 4 tasks on the project board).
