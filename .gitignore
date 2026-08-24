@@ -1,10 +1,20 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Dependencies
+node_modules/
 
-# Virtual environments
-.venv
+# Environment
+.env
+
+# Test coverage
+coverage/
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
