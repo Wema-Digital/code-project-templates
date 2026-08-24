@@ -1,325 +1,100 @@
-# Todo Template for Software Development Projects
+# Todo — machine-learning
 
-> A comprehensive task tracking template for any programming language or framework.
-> Works seamlessly with Claude Code for AI-assisted development.
+> ML pipeline project tasks. Uses the same symbol system as the base template.
+> See the Symbol Guide below for reference.
 
 ## Symbol Guide
 
-| Symbol | Meaning                   | Example Use Case                    |
-|--------|---------------------------|-------------------------------------|
-| `[ ]`  | Unstarted task            | `- [ ] Create project structure`    |
-| `[x]`  | Completed task            | `- [x] Setup CI/CD pipeline`        |
-| `[-]`  | In-progress               | `- [-] Implementing user auth`      |
-| `[~]`  | On hold                   | `- [~] Performance optimization`    |
-| `[>]`  | Delegated/postponed       | `- [>] Design system review`        |
-| `[!]`  | High priority             | `- [!] Fix critical bug`            |
-| `[?]`  | Needs research            | `- [?] Best caching strategy`       |
-| `[@]`  | Requires discussion       | `- [@] API design approach`         |
-| `[$]`  | Budget-related            | `- [$] Cloud hosting costs`         |
-| `[#]`  | Medium priority           | `- [#] Update documentation`        |
-| `[%]`  | Percentage completed      | `- [% 60] Integration tests`        |
-| `[→]`  | Moved to another section  | `- [→] Moved to maintenance`        |
-| `[⚠]`  | Critical issue            | `- [⚠] Security vulnerability`      |
+| Symbol | Meaning | When to use with Claude |
+|--------|---------|-------------------------|
+| `[ ]` | Unstarted | Default for all new tasks |
+| `[x]` | Completed | Ask Claude to mark tasks done |
+| `[-]` | In-progress | Claude marks what it's actively working on |
+| `[!]` | High priority | Focus here first |
+| `[@]` | Needs discussion | Ask Claude for design input |
+| `[?]` | Needs research | Have Claude research options |
+| `[#]` | Medium priority | After `[!]` tasks |
+| `[~]` | On hold | Skip for now |
+| `[>]` | Delegated/deferred | Assigned elsewhere or future |
+| `[⚠]` | Critical issue | Urgent bug or blocker |
+| `[%]` | % complete | Track large in-progress features |
 
-This template maintains compatibility with GitHub/GitLab rendering while adding enhanced task management features for:
+---
 
-- Multi-language project development
-- Feature planning and implementation
-- Code quality and testing workflows
-- DevOps and deployment tracking
-- Collaboration with Claude Code AI assistant
-- Progress monitoring and team coordination
-
-**Working with Claude Code:**
-
-When using this template with Claude Code, you can:
-- Ask Claude to read this file and suggest next tasks
-- Reference specific tasks in your prompts (e.g., "Complete the [!] task in Project Setup")
-- Request Claude to update task statuses as work progresses
-- Use [@] markers to flag items where you need Claude's input on approach
-- Track percentage completion with [%] for incremental features
-
-## Customization Guide
+## Project Setup
 
 ```markdown
-1. **Priority Mapping**
-   `(!) → High | (#) → Medium | ( ) → Low`
-
-2. **Status Indicators**
-   Combine symbols: `- [x][!] Completed security patch`
-
-3. **Progress Tracking**
-   Use percentages: `- [% 85] Feature implementation`
-
-4. **Team Coordination**
-   `(@) = Discussion needed | (>) = Delegated to team member`
-
-5. **Custom Symbols**
-   Add project-specific markers:
-
-| Custom Symbol | Meaning                    |
-|---------------|----------------------------|
-| `[🚀]`         | Deployment related         |
-| `[📝]`         | Documentation needed       |
-| `[🔧]`         | Configuration/setup        |
-| `[🎨]`         | UI/UX work                 |
-| `[🔒]`         | Security related           |
-| `[⚡]`         | Performance improvement    |
-| `[🧪]`         | Testing/QA                 |
+- [x] [!] Initialise git repository and branch (py-ml)
+- [x] [!] Create requirements.txt (pandas, scikit-learn, numpy, matplotlib), pinned tightly
+- [x] [!] Create requirements-dev.txt (pytest)
+- [x] [!] Pin Python version in .python-version (3.12)
+- [x] [!] .gitignore: data/, models/, *.png, *.csv, .ipynb_checkpoints/
+- [ ] [@] Decide where real data will live once load_data() stops using the toy dataset (data/ dir, S3, a warehouse table)
 ```
 
 ---
 
-## Project Setup & Planning
-
-Essential tasks for initializing your project:
+## Pipeline
 
 ```markdown
-- [ ] [!] Initialize version control (git repository)
-- [ ] [@] Define project requirements and scope
-- [ ] [ ] Choose technology stack:
-  - [ ] Programming language(s)
-  - [ ] Framework(s) and libraries
-  - [ ] Database system (if needed)
-  - [ ] Development tools and IDE
-- [ ] [🔧] Setup development environment:
-  - [ ] Install dependencies
-  - [ ] Configure build tools
-  - [ ] Setup environment variables (.env files)
-  - [ ] Create project structure (src/, tests/, docs/)
-- [ ] [#] Document architecture decisions
-- [ ] [@] Establish coding standards and style guide
-- [ ] [$] Evaluate third-party service costs
-- [ ] [>] Setup project management tools (Jira, Linear, etc.)
-```
-
-**Example with Claude Code:**
-```markdown
-- [x] Initialize git repository
-- [-] [!] Setup project dependencies    # Claude is currently helping with this
-- [ ] [@] Decide on state management    # Need to discuss Redux vs Context API
+- [x] [!] src/pipeline.py — load_data() → prepare_features() → train_model() → evaluate_model()
+- [x] [!] run_pipeline() — wires the four steps together end to end
+- [x] [#] plot_results() — optional matplotlib bar chart, behind --plot (headless-safe: Agg backend)
+- [ ] [!] Swap load_data() for a real data source (CSV, database, API) when you have one
+- [ ] [#] Feature engineering beyond the raw iris columns, once real data has more to prepare
+- [ ] [@] Decide on the model: LogisticRegression is a placeholder — pick a real one once there's a real problem
+- [ ] [?] Research whether the toy dataset's stratified split is still the right validation strategy for real data (k-fold? time-based split?)
 ```
 
 ---
 
-## Core Development
-
-Feature implementation and core functionality:
-
-### Feature: User Authentication
-```markdown
-- [ ] [!] Design authentication flow
-- [ ] [ ] Implement user registration:
-  - [ ] Create registration form/endpoint
-  - [ ] Validate user input
-  - [ ] Hash passwords securely
-  - [ ] Store user data
-- [ ] [-] [#] Build login functionality
-- [ ] [?] Research OAuth integration options
-- [ ] [@] Discuss session vs JWT approach
-- [ ] [% 30] Password reset feature
-```
-
-### Feature: Core Application Logic
-```markdown
-- [ ] [!] Implement main business logic
-- [ ] [ ] Create data models/schemas
-- [ ] [🔧] Setup database connections
-- [ ] [ ] Build API endpoints/interfaces:
-  - [ ] [!] Create resource endpoint
-  - [ ] [#] Update resource endpoint
-  - [ ] [ ] Delete resource endpoint
-  - [ ] [ ] List/search endpoints
-- [ ] [~] Add pagination support
-- [ ] [>] Implement advanced filtering
-```
-
-### Feature: User Interface (if applicable)
-```markdown
-- [ ] [🎨] Design component architecture
-- [ ] [ ] Build reusable UI components:
-  - [ ] Button component
-  - [ ] Form input components
-  - [ ] Navigation components
-  - [ ] Modal/dialog components
-- [ ] [-] [!] Implement responsive layouts
-- [ ] [% 50] Add loading states and error handling
-- [ ] [@] Discuss accessibility requirements
-```
-
-**Claude Code Tips:**
-- Break features into small, atomic tasks that Claude can complete in one session
-- Use [!] for tasks that Claude should prioritize
-- Mark [?] items to ask Claude for research and recommendations
-- Track [%] completion for large features Claude is building incrementally
-
----
-
-## Code Quality & Documentation
-
-Maintaining clean, documented code:
+## Metrics & Experiment Tracking
 
 ```markdown
-- [ ] [!] Setup linting and formatting:
-  - [ ] Configure linter (ESLint, Pylint, Clippy, etc.)
-  - [ ] Add format tool (Prettier, Black, rustfmt, etc.)
-  - [ ] Create pre-commit hooks
-- [ ] [@] Establish code review process
-- [ ] [ ] Write technical documentation:
-  - [ ] [📝] Architecture overview
-  - [ ] [📝] API documentation
-  - [ ] [📝] Setup instructions
-  - [ ] [📝] Contribution guidelines
-- [ ] [#] Add inline code comments
-- [ ] [% 40] Type annotations/hints (if applicable)
-- [ ] [~] Refactor legacy code sections
-- [ ] [>] Peer review requested for auth module
-```
-
-**Working with Claude:**
-```markdown
-- [x] [@] Asked Claude to explain complex algorithm in api/utils.js:145
-- [-] [📝] Having Claude generate API documentation from code
-- [ ] [!] Request Claude to refactor error handling patterns
+- [x] [!] evaluate_model() — accuracy, the simplest metric that proves the loop works
+- [ ] [#] Add metrics beyond accuracy (precision/recall/F1, or a regression metric if the problem changes)
+- [ ] [~] Experiment tracking (MLflow or similar) — optional/advanced, not required for "intermediate"; add once there's more than one model/run to compare
+- [ ] [@] Decide on a baseline to compare future models against
 ```
 
 ---
 
-## Testing & Quality Assurance
-
-Ensuring reliability and correctness:
+## Testing
 
 ```markdown
-- [ ] [!] Setup testing framework:
-  - [ ] Choose test runner (Jest, pytest, cargo test, etc.)
-  - [ ] Configure test environment
-  - [ ] Setup code coverage tools
-- [ ] [ ] Write unit tests:
-  - [ ] [!] Test authentication logic
-  - [ ] [#] Test business logic functions
-  - [ ] [% 55] Test utility functions
-  - [ ] [ ] Test edge cases
-- [ ] [🧪] Create integration tests:
-  - [ ] Test API endpoints
-  - [ ] Test database operations
-  - [ ] Test external service integrations
-- [ ] [~] Implement end-to-end tests
-- [ ] [⚠] Fix failing test in payment module
-- [ ] [@] Discuss test coverage goals (80%? 90%?)
-- [ ] [?] Research property-based testing
+- [x] [!] Setup pytest
+- [x] [!] tests/test_pipeline.py — prepare_features() determinism + split-size tests (the deterministic step, per spec)
+- [x] [#] One end-to-end smoke test on run_pipeline() — proves the scaffold works end to end
+- [ ] [!] Test any new feature-engineering step the same way: deterministic, isolated from training
+- [ ] [#] Test evaluate_model() directly once metrics beyond accuracy are added
+- [ ] [% 0] Reach 80% test coverage
 ```
 
-**Bug Tracking:**
+**Claude Code for testing:**
 ```markdown
-- [ ] [⚠] Critical: Login fails with special characters in password
-- [ ] [!] High: Memory leak in file upload handler
-- [ ] [#] Medium: UI glitch on mobile devices
-- [ ] [ ] Low: Inconsistent button styling
-```
-
-**Claude Code for Testing:**
-```markdown
-- [x] Asked Claude to generate unit tests for validator.js
-- [-] [% 70] Claude writing integration tests for API endpoints
-- [ ] [!] Have Claude fix the failing authentication test
+- [ ] [!] Ask Claude to generate tests for any new pipeline step added above
+- [ ] [#] Have Claude review test coverage report and suggest gaps
 ```
 
 ---
 
-## Deployment & DevOps
-
-Production readiness and operations:
+## CI / Deployment
 
 ```markdown
-- [ ] [!] Setup CI/CD pipeline:
-  - [ ] [🚀] Configure build automation
-  - [ ] [🧪] Add automated testing in CI
-  - [ ] [🚀] Setup deployment automation
-  - [ ] [ ] Configure deployment environments
-- [ ] [@] Choose hosting platform:
-  - [ ] [$] Evaluate costs (AWS, GCP, Azure, Vercel, etc.)
-  - [ ] [?] Research scaling requirements
-  - [ ] [ ] Compare feature sets
-- [ ] [🔧] Environment configuration:
-  - [ ] [!] Setup production environment variables
-  - [ ] [#] Configure staging environment
-  - [ ] [ ] Setup development environment
-- [ ] [🔒] [!] Security hardening:
-  - [ ] Enable HTTPS/TLS
-  - [ ] Configure firewall rules
-  - [ ] Setup secrets management
-  - [ ] Enable DDoS protection
-- [ ] [ ] Implement monitoring and logging:
-  - [ ] [!] Setup error tracking (Sentry, etc.)
-  - [ ] [#] Configure application logging
-  - [ ] [ ] Setup performance monitoring (APM)
-  - [ ] [ ] Create alerting rules
-- [ ] [>] Setup container orchestration (Docker/Kubernetes)
-- [ ] [% 25] Database backup and recovery procedures
-```
-
-**Deployment Checklist:**
-```markdown
-- [ ] [!] Run full test suite
-- [ ] [!] Update version numbers
-- [ ] [📝] Write release notes
-- [ ] [🚀] Deploy to staging
-- [ ] [🧪] QA testing on staging
-- [ ] [@] Get deployment approval
-- [ ] [🚀] Deploy to production
-- [ ] [!] Monitor for errors post-deployment
+- [x] [!] .github/workflows/test.yml — installs requirements + requirements-dev, runs pytest
+- [ ] [#] Add lint step to CI (ruff or flake8)
+- [ ] [@] Decide on a deployment target once there's a model worth serving (batch job, API endpoint, scheduled retrain)
+- [ ] [~] Dockerise, if the pipeline needs to run somewhere other than a dev machine
 ```
 
 ---
 
-## Maintenance & Optimization
-
-Ongoing improvements and upkeep:
+## Code Quality
 
 ```markdown
-- [ ] [⚡] Performance optimization:
-  - [ ] [?] Profile application performance
-  - [ ] [!] Optimize slow database queries
-  - [ ] [#] Reduce bundle size
-  - [ ] [ ] Implement caching strategies
-  - [ ] [% 45] Add lazy loading for images
-- [ ] [🔒] Security updates:
-  - [ ] [⚠] Patch critical vulnerability in dependency
-  - [ ] [!] Update authentication library
-  - [ ] [#] Run security audit
-  - [ ] [ ] Update SSL certificates
-- [ ] [🔧] Dependency management:
-  - [ ] [#] Update minor version dependencies
-  - [ ] [~] Research migration to new framework version
-  - [ ] [@] Discuss removing unused dependencies
-- [ ] [~] Technical debt reduction:
-  - [ ] [>] Refactor monolithic module
-  - [ ] [ ] Replace deprecated API calls
-  - [ ] [#] Improve error handling consistency
-- [ ] [@] Backward compatibility considerations
-- [ ] [$] Cost optimization review
-```
-
-**Monitoring Tasks:**
-```markdown
-- [ ] [!] Investigate spike in error rates
-- [ ] [#] Review performance metrics
-- [ ] [ ] Analyze user feedback
-- [ ] [⚠] Critical: Database running out of disk space
-```
-
----
-
-## Notes & Ideas
-
-Use this section for brainstorming and tracking ideas:
-
-```markdown
-- [ ] [?] Consider implementing GraphQL API
-- [ ] [💡] Idea: Add dark mode toggle
-- [ ] [@] Discuss: Should we add real-time features?
-- [ ] [~] Maybe: Mobile app version
-- [ ] [>] Future: AI-powered recommendations
+- [ ] [#] Configure ruff (lint + format)
+- [ ] [~] Add pre-commit hooks
+- [ ] [ ] Add docstrings to public functions as the pipeline grows past this scaffold
 ```
 
 ---
@@ -327,27 +102,5 @@ Use this section for brainstorming and tracking ideas:
 ## Metadata
 
 *Last Updated: 2026-08-24*
-*Template Version: 3.1*
-*Applicable to: Any programming language/framework*
-
-**Customization Notes:**
-- Adapt sections based on your project type (web app, CLI tool, library, API, etc.)
-- Remove or add sections as needed (e.g., mobile-specific, data pipeline, game dev)
-- Customize emoji symbols to match your team's workflow
-- Integrate with your existing project management tools
-- Use with Claude Code for AI-assisted development and task tracking
-
-**Language-Specific Variations:**
-- Web: Add frontend/backend separation, API versioning
-- CLI Tools: Add command design, argument parsing, installation tasks
-- Libraries: Add API design, versioning, documentation generation
-- Mobile: Add platform-specific tasks (iOS, Android), app store deployment
-- Data Science: Add data pipeline, model training, experiment tracking
-
-**Claude Code Integration:**
-For best results when using this template with Claude Code:
-1. Share this file with Claude at the start of your project
-2. Ask Claude to read it periodically to stay aligned with priorities
-3. Request Claude to update task statuses as work completes
-4. Use [@] markers to request Claude's input on architectural decisions
-5. Reference specific tasks in your prompts for focused work sessions
+*Template Version: 1.0*
+*Stack: Python 3.12 + scikit-learn + pandas + numpy + matplotlib + pytest*

@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+venv
+
+# Test artifacts
+.pytest_cache/
+.coverage
+
+# Data, models, and generated plots — never commit these, they belong
+# in a data store or artifact registry, not git
+data/
+models/
+*.png
+*.csv
+
+# Notebook checkpoints
+.ipynb_checkpoints/
