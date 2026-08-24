@@ -1,0 +1,4 @@
+# Test tooling — install alongside requirements.txt
+-r requirements.txt
+
+pytest>=7.4.0
