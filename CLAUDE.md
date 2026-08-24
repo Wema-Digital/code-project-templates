@@ -8,32 +8,71 @@ This is the **Flask web application template** of the `coding-project-templates`
 
 ## Stack
 
-- **Language**: Python
-- **Framework**: Flask (app factory pattern)
-- **Database**: SQLite (dev) / PostgreSQL (prod) via SQLAlchemy
+- **Language**: Python 3.12
+- **Framework**: Flask 3 (app factory pattern)
 - **Testing**: pytest + pytest-flask
-- **Linting**: Ruff
 - **CI**: GitHub Actions
+
+No database layer is included — `web-flask` stays deliberately simpler than `web-django`. Add `Flask-SQLAlchemy` only if a project actually needs persistence.
+
+## Project layout
+
+```
+app/
+  __init__.py   ← create_app() factory — registers blueprints, reads SECRET_KEY
+  routes.py     ← main blueprint (GET /health)
+tests/
+  conftest.py   ← pytest-flask `app` fixture
+  test_app.py   ← GET /health example test
+run.py          ← Entry point: loads .env, calls create_app()
+.github/
+  workflows/
+    test.yml    ← CI: pip install (both requirement files) + pytest
+```
 
 ## What this template contains
 
 | File | Purpose |
 |---|---|
-| `todo.md` | Language-agnostic task tracking template (from base) |
-| `README.md` | Guide to using this template with Claude Code (from base) |
-| `requirements.txt` | Python deps example — extend with Flask packages |
-| `.claude/plan.md` | Base template plan (for reference) |
+| `todo.md` | Flask-specific task tracking template |
+| `README.md` | Guide to using this template with Claude Code |
+| `requirements.txt` | Runtime deps (Flask, python-dotenv) |
+| `requirements-dev.txt` | Test deps (pytest, pytest-flask) — installs runtime deps too via `-r requirements.txt` |
+| `.env.example` | `FLASK_APP`, `FLASK_ENV`, `SECRET_KEY` |
+| `.claude/plan.md` | Phase 5 plan for this template, and what was deliberately deferred |
 | `CLAUDE.md` | This file |
 
-**Planned additions (Phase 5):**
-- `src/__init__.py` — app factory (`create_app()`)
-- `src/blueprints/main.py` — example blueprint with a health-check route
-- `src/config.py` — config classes (Dev, Prod, Testing)
-- `tests/conftest.py` — pytest-flask fixtures
-- `tests/test_routes.py` — scaffold with one passing test
-- `.env.example` — `SECRET_KEY`, `DATABASE_URL`, `FLASK_ENV`
-- `requirements.txt` — updated with `flask`, `flask-sqlalchemy`, `pytest-flask`
-- `.github/workflows/test.yml` — CI on push
+## Key patterns
+
+**App factory** — `app/__init__.py` exports `create_app()` rather than a module-level `app`. Tests build a fresh instance per test via the `app` fixture in `tests/conftest.py`:
+
+```python
+# tests/conftest.py
+@pytest.fixture
+def app():
+    app = create_app()
+    app.config.update(TESTING=True)
+    yield app
+```
+
+`pytest-flask` then supplies the `client` fixture automatically for any test that takes it as an argument.
+
+**Adding a blueprint**:
+```python
+# app/users.py
+from flask import Blueprint, jsonify
+users = Blueprint("users", __name__)
+
+@users.route("/users")
+def list_users():
+    return jsonify(users=[])
+
+# app/__init__.py
+from app.users import users
+app.register_blueprint(users)
+```
+
+**Deliberately not built yet** (see `todo.md` for the full list): config classes (Dev/Prod/Testing), centralised error handlers, a second blueprint beyond `/health`.
 
 ## Repo conventions (from root CLAUDE.md)
 

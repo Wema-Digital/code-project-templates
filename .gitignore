@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+venv
+
+# Environment variables
+.env
+
+# Test artifacts
+.pytest_cache/
+.coverage
