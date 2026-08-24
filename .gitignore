@@ -8,3 +8,15 @@ wheels/
 
 # Virtual environments
 .venv
+venv
+
+# Environment variables
+.env
+
+# Django
+db.sqlite3
+staticfiles/
+
+# Test artifacts
+.pytest_cache/
+.coverage
