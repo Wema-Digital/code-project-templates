@@ -1,10 +1,5 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Local env files, if a script ever needs one
+.env
 
-# Virtual environments
-.venv
+# Editor/OS cruft
+.DS_Store
