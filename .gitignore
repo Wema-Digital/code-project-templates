@@ -1,10 +1,8 @@
-# Python-generated files
+# Python cache from .github/scripts/validate_claude_config.py (CI tooling only —
+# this template has no runtime deps of its own)
 __pycache__/
 *.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
 
-# Virtual environments
-.venv
+# Local settings overrides (personal permissions/tool prefs) — .claude/settings.json
+# itself IS committed (it's the example), this is only for a developer's own overrides
+.claude/settings.local.json
