@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+venv
+
+# MkDocs build output — CI builds it fresh, don't commit it
+site/
