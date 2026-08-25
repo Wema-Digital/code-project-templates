@@ -18,6 +18,7 @@ A multi-template scaffold library for Wema Digital projects. Each template lives
 | `features/manuals` | `manus` | Documentation site (MkDocs) |
 | `features/python-app` | `py-app` | Python application |
 | `features/python-scripts` | `py-script` | Python utility scripts |
+| `features/vscode-workspace-gen` | `vscode-gen` | Workspace generator — interviews a user, produces a standalone multi-template project |
 | `features/web-django` | `py-django` | Django web app |
 | `features/web-flask` | `py-flask` | Flask web app |
 | `features/wsl-scripts` | `wsl-tools` | WSL/Bash utility scripts |
