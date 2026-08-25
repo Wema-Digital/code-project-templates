@@ -1,62 +1,87 @@
-# CLAUDE.md — claude-code-advance
+# CLAUDE.md — vscode-workspace-gen
 
-This is the **advanced Claude Code template** of the `coding-project-templates` library. It lives on branch `claude-code-a` and is checked out as a git worktree at `features/claude-code-advance` within the root repo.
+This is the **workspace generator** template of the `coding-project-templates` library. It lives on branch `vscode-gen` and is checked out as a git worktree at `features/vscode-workspace-gen` within the root repo. It is a customised `claude-code-advance` (branch `claude-code-a`): the same subagent/hook/slash-command machinery, aimed at one concrete job instead of staying a generic teaching example.
 
-## Role of this template
+## What this tool does
 
-`claude-code-advance` builds on `claude-code-basic` (branch `claude-code-b`) and adds Claude Code-specific power features: custom subagents, hooks, and slash commands. It is intended for developers who want a pre-configured, production-ready Claude Code setup beyond the language-agnostic starter.
+It builds a standalone, multi-template project folder: you pick which templates from `coding-project-templates` you want (`web-flask` + `python-scripts`, say), and it produces a folder with `.vscode/`, `features/` (one git worktree per selected template), `README.md`, and `scripts/` — ready to open and work in, with no ongoing dependency on this repo's location.
 
-Base layer changes from `claude-code-basic` are merged in via `git merge claude-code-b` and then extended with advanced Claude Code configuration here.
+## Two jobs a session opened here might be doing
 
-Keep `todo.md` in sync with `claude-code-b` conceptually (same symbol system), but this template's own `todo.md` content is advanced-Claude-Code-specific, not the generic base copy. There is no `requirements.txt` here — this template has no runtime dependencies of its own; it's Claude Code configuration, not an application.
+A Claude Code session in this folder is always doing one of two things. Work out which before doing anything else:
 
-## A live example: this repo's own root CLAUDE.md
+1. **Interviewing** — no `claude/N-*.md` spec exists yet for what the user wants. Ask: which templates, output path, target machine (native Windows or WSL2 — see below), any naming/branch preferences. Write the answers as a spec to `claude/N-Title.md` in *this worktree's own* `claude/` folder (not the root repo's) and stop there for review — this session does not generate files itself.
+2. **Generating** — a reviewed `claude/N-*.md` spec already exists. Read it, then actually build the output folder: bare-clone, worktrees, `.vscode/`, docs, scripts. This is the only case where this session writes into the output path.
 
-The best illustration of what this template teaches isn't hypothetical — it's the file at the root of this repo, `/CLAUDE.md`. Read it. It's a real, working example of:
-- A **repo-purpose section** written for Claude Code to load automatically at session start (no command/hook needed for this part — Claude Code reads any `CLAUDE.md` in the working directory tree on its own)
-- A **commit-message convention** and a **GitHub Project workflow** that this repo's own sessions have followed literally, commit after commit, across every template in Phase 5
-- A **worktree map** that a subagent like this template's own `doc-sync-checker` could just as easily be pointed at to check for staleness
+Never skip straight to generating from an interview in the same turn — the spec gets written, then reviewed, then built. That gap is deliberate: it is the user's chance to correct a misread requirement before any files exist on disk.
 
-If you're designing your own advanced Claude Code setup, `/CLAUDE.md` at this repo's root is worth reading end to end before writing your first command or hook — it shows what a `CLAUDE.md` earns its keep by doing, versus what's just documentation nobody reads.
+## Standing rule: check current VS Code docs before finalising settings
+
+Every run, before writing `.vscode/*.code-workspace` settings, check the current VS Code docs for the settings keys in use (`python.defaultInterpreterPath`, `terminal.integrated.*`, etc. drift between releases). This is not a one-time thing done when this template was built — the schema changes over time, so re-verify it live, every generation.
+
+## Standing rule: ask Windows vs WSL2, but don't rely on it for portability
+
+The generated project's `.vscode/*.code-workspace` needs to work regardless of whether it's opened on native Windows or through WSL2. Ask which one the user's targeting, because a handful of settings genuinely are OS-specific — but the actual portability fix is writing paths as `${workspaceFolder}`-relative wherever the settings schema allows it, not hardcoded absolutes. This repo's own committed workspace file hardcoded a WSL path (`/mnt/w/vscode.workspaces/...`) into several settings and broke the moment someone opened it natively — don't repeat that.
+
+## The bare-clone-then-worktree mechanism
+
+A `git worktree` is not standalone by construction: `features/web-flask/.git` in this repo is a pointer file back to `coding-project-templates/.git/worktrees/web-flask`, which points at the object database in `coding-project-templates/.git`. Running `git worktree add` straight from this live checkout into a generated project would silently tie that project to this repo's exact current path forever.
+
+The fix: generate a fresh **bare clone of this repo inside the output folder** (`<output>/.git-store/`), then run `git worktree add` for each selected template against that local bare clone, not against this live checkout. The generated folder keeps the full worktree experience (branch checked out, complete history, `git worktree list` works) while depending on nothing outside itself.
+
+## Output folder shape
+
+```
+<output>/
+├── .git-store/            # bare clone of coding-project-templates — not the live checkout
+├── .vscode/
+│   └── *.code-workspace    # OS-appropriate, ${workspaceFolder}-relative paths
+├── features/
+│   └── <template>/         # git worktree per selected template, against .git-store
+├── scripts/                 # small, single-purpose — see below, not one monolith
+├── .workspace-manifest.json # which templates + commit/branch went in
+├── README.md
+├── CLAUDE.md                # generated, summarises what's included and how it was assembled
+└── todo.md                  # post-generation checklist: rename package, fill .env, add a remote
+```
+
+## `scripts/` philosophy: small and composable, not one monolith
+
+This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five loosely related things in one file (env file, workspace file, csv, docs generation, debug/task config) and its docs generation is already broken. Don't repeat that shape here. Each generated script does one thing:
+
+- `setup-env.sh` — bootstraps whichever languages actually got included, not a one-size-assumes-Python script
+- `git-sync-all.sh` — status/commit/push across every worktree branch in the generated project; reused from this repo's own phase 2 version
+- `sync-templates.sh` — pulls upstream template improvements from `coding-project-templates` into the generated project's branches after the fact
+- `health-check.sh` — smoke-tests that each included template's own test suite still passes
+
+`.devcontainer/` generation is a nice-to-have flagged for later, not a v1 requirement — don't build it unless asked.
 
 ## What this template contains
 
 | File | Purpose |
 |---|---|
-| `.claude/commands/todo-next.md` | `/todo-next` — reads `todo.md`, reports the next task by priority symbol |
-| `.claude/agents/doc-sync-checker.md` | Read-only subagent — checks README/CLAUDE.md/todo.md consistency |
-| `.claude/settings.json` + `.claude/hooks/validate-json.sh` | `PostToolUse` hook — checks `.claude/*.json` still parses after an edit |
-| `.github/scripts/validate_claude_config.py` + `.github/workflows/validate-config.yml` | CI counterpart to the hook |
-| `todo.md` | Advanced-Claude-Code-specific task tracking template |
-| `README.md` | Guide to using this template, framed as building on `claude-code-basic` |
-| `.claude/plan.md` | Phase 5 plan for this template, and what was deliberately deferred |
+| `.claude/commands/todo-next.md` | Inherited from `claude-code-advance` — reads `todo.md`, reports the next task |
+| `.claude/agents/doc-sync-checker.md` | Inherited from `claude-code-advance` — checks README/CLAUDE.md/todo.md consistency |
+| `.claude/settings.json` + `.claude/hooks/validate-json.sh` | Inherited — validates `.claude/*.json` still parses after an edit |
+| `.claude/plan.md` | This template's own construction plan (bare-clone mechanism, output shape, Q&A flow) |
+| `README.md` | What this tool does, the 4-step process, how to invoke it |
 | `CLAUDE.md` | This file |
 
-## Key patterns
-
-**Subagent `tools` is a comma-separated string, not a YAML list** — `tools: Read, Grep, Glob`, not `tools: [Read, Grep, Glob]`. Easy to get wrong copying from other frontmatter conventions; `doc-sync-checker.md` gets it right.
-
-**Scope a subagent's tools to what it actually needs** — `doc-sync-checker` has no `Edit`/`Write` because it only ever reports findings back to the calling session, never changes files itself. If a future agent needs to fix what it finds, that's a deliberate, visible choice in its `tools` line, not an accident.
-
-**A hook's `command` type reads its payload from stdin as JSON**, not as arguments — `tool_name`, `tool_input`, `tool_result`, `session_id`, `cwd`, etc. `validate-json.sh` pulls `tool_input.file_path` out with `python3 -c '...'` rather than assuming shell-friendly argv. Exit code `2` is the one that blocks/gives feedback; `0` is a clean pass; other non-zero codes are non-blocking. On `PostToolUse` specifically, exit-2 stderr is surfaced back to Claude as feedback — that's what makes the hook self-correcting instead of just a silent no-op.
-
-**`allowed-tools` in a command's frontmatter narrows, it doesn't grant** — `/todo-next` sets `allowed-tools: Read` because that's genuinely all it needs; it doesn't expand what the session could already do.
-
-**Deliberately not built yet** (see `todo.md` for the full list): more example commands/agents beyond one of each, a documented multi-file refactor workflow (noted as a `todo.md` discussion topic, not a shipped deliverable).
+**Not yet built** (Phase 6, Card 2 — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root): `.claude/commands/generate-workspace.md` (starts the interview), `.claude/agents/workspace-architect.md` (asks the clarifying questions, writes the spec), a hook validating the *generated* `.vscode/*.code-workspace` is well-formed JSON (distinct from the inherited hook above, which only checks this template's own `.claude/*.json`), and the `scripts/generate-workspace.py` core logic plus the four generated-project scripts described above.
 
 ## Repo conventions (from root CLAUDE.md)
 
-- **Commits** on this branch: `feat: <what changed>` or `phase 5 intermediate: <what changed>`
-- **Push** to `origin claude-code-a` from inside this worktree
-- **Planning notes** live in the root repo's `claude/` folder (numbered `N-Title.md`), not here
-- **GitHub Project**: [Wema-Digital/projects/2](https://github.com/orgs/Wema-Digital/projects/2) — mark tasks Done after committing
+- **Commits** on this branch: `feat: <what changed>` or `phase 6 workspace generator: <what changed>`
+- **Push** to `origin vscode-gen` from inside this worktree
+- **Planning notes**: this worktree keeps its own `claude/N-*.md` specs (interview output, one per generated-workspace request) — separate from the root repo's `claude/` folder, which tracks this repo's own phase planning
+- **GitHub Project**: [Wema-Digital/projects/2](https://github.com/orgs/Wema-Digital/projects/2), Phase 6 — mark tasks Done after committing
 
 ## Receiving base updates
 
-When `claude-code-basic` is updated, merge changes into this branch:
+When `claude-code-advance` is updated, merge changes into this branch:
 
 ```bash
-cd features/claude-code-advance   # branch claude-code-a
-git merge claude-code-b
-git push origin claude-code-a
+cd features/vscode-workspace-gen   # branch vscode-gen
+git merge claude-code-a
+git push origin vscode-gen
 ```

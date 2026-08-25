@@ -1,32 +1,70 @@
-> **Status**: Executed 2026-08-24 (Phase 5 — Intermediate Templates). Supersedes the base-template plan below, which was scoped to the generic `claude-code-basic` stub this template started from.
+# Plan — vscode-workspace-gen
+
+> **Status**: Card 1 (Scaffold the vscode-workspace-gen template) executed 2026-08-25. Card 2 (agents/hooks/scripts) and Card 3 (end-to-end test) are not started — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root.
 
 ## Context
 
-`claude-code-advance` was carrying the language-agnostic base template verbatim (generic `todo.md`, generic `README.md`, a `requirements.txt` with `pandas` in it, and a stray `.python-version`) — none of which fit a template whose entire subject is Claude Code's own advanced features. The GitHub Project task "Design claude-code-advance content" (Phase 5) calls for one working example command, one working example subagent, a short hook example, and a minimal CI check, per `claude/5-Phase 5 Detailed Breakdown.md`.
+Phase 6 builds a new template, `vscode-workspace-gen`, whose entire job is generating other projects: interview a user about which `coding-project-templates` templates they want, then produce a standalone folder combining them. `claude/6-Phase 6 Process Design (review).md` settled the shape and the one real technical tension (bare-clone-vs-live-worktree) before any code was written; this plan carries that forward for the scaffold step specifically.
 
-Before writing any of this, verified the exact current schemas for command/agent frontmatter and the hooks `settings.json` format against the official Claude Code docs (`code.claude.com/docs/en/{skills,sub-agents,hooks}.md`) rather than relying on memory — this template's whole job is teaching those schemas correctly, so getting them wrong here would be worse than not shipping an example at all.
+Prerequisite already satisfied: `claude-code-advance` (branch `claude-code-a`) carries one working example command, subagent, and hook (Phase 5) — this template branches from that content rather than duplicating it from scratch.
 
-## Goal
+## Goal (Card 1 scope only)
 
-Three genuinely working examples — a slash command, a subagent, a hook — that all touch something real about this repo's own conventions (the `todo.md` symbol system, keeping template docs in sync), rather than generic "hello world" stand-ins. Plus a CI check that validates `.claude/` config actually parses.
+Stand up the worktree and its orientation docs — `README.md`, `CLAUDE.md`, this plan — accurately describing a tool that doesn't do its actual job yet. Card 2 builds the generation logic; this step just gives a session opened here the right standing rules and mental model before that code exists.
 
-## What was built
+## The bare-clone-then-worktree mechanism
 
-- Removed `requirements.txt` and `.python-version` — this template has no runtime deps and isn't Python-specific; same cleanup class as `js-express`/`wsl-scripts` needed for their stray stub files
-- `.claude/commands/todo-next.md` — `/todo-next [section]`: reads `todo.md`, reports the next task in priority-symbol order (`[⚠]` → `[!]` → `[#]` → `[ ]`), optionally scoped to one section. `allowed-tools: Read` since it only needs to read
-- `.claude/agents/doc-sync-checker.md` — a read-only subagent (`tools: Read, Glob, Grep`, no `Edit`) that checks a template directory's `README.md`/`CLAUDE.md`/`todo.md` for internal consistency: stale "planned additions" language, references to files that don't exist, contradictions between the two docs. `description` includes "Use proactively" per the docs' auto-invocation convention. This is deliberately not a toy example — it's the exact staleness pattern found and fixed across `web-flask`, `web-django`, `python-app`, `python-scripts`, `machine-learning`, and `wsl-scripts` earlier in Phase 5
-- `.claude/settings.json` + `.claude/hooks/validate-json.sh` — a `PostToolUse` hook (matcher `Edit|Write`) that checks any `.claude/*.json` file Claude just touched still parses; exits 2 (surfacing stderr back to Claude) on invalid JSON so it can self-correct immediately rather than only finding out from the next CI run
-- `.github/scripts/validate_claude_config.py` + `.github/workflows/validate-config.yml` — CI counterpart to the hook: validates every `.claude/*.json` file is valid JSON and every `.claude/commands/*.md`/`.claude/agents/*.md` file has YAML frontmatter that actually parses (`pyyaml`, installed ad hoc in the CI step — no project-level dependency file for a one-script CI tool)
-- `README.md`, `todo.md`, `CLAUDE.md` — rewritten advanced-Claude-Code-specific, `CLAUDE.md` pointing at the repo's own root `CLAUDE.md` as a live example of what this template teaches (per spec)
+Decided in the process design review, restated here as the thing Card 2's `scripts/generate-workspace.py` must implement:
 
-## Deliberately deferred (left as `todo.md` items, not built now)
+1. `git clone --bare` this repo into `<output>/.git-store/`
+2. For each selected template, `git worktree add <output>/features/<name> <branch>` run **against `<output>/.git-store`**, not against the live `coding-project-templates` checkout
+3. Result: the generated folder has the full worktree experience (branch checked out, complete history) with zero dependency on where `coding-project-templates` happens to live afterward
 
-- Multi-file refactor workflow guidance — noted in the spec as a `todo.md` topic, not a deliverable to build
-- More example commands/agents — one of each establishes the convention; see `todo.md` for what to add next
-- `.claude/settings.local.json` — gitignored, left for a developer's own overrides, not shipped
+Rejected alternative: `git worktree add` straight from the live checkout into the output folder. Simpler, but ties the generated project to this repo's current path permanently — moving, deleting, or not sharing `coding-project-templates` alongside it breaks every worktree inside.
 
-## Verification (no unit tests — this template's own convention is a walkthrough, per spec)
+## Output folder shape
 
-- `bash .claude/hooks/validate-json.sh` tested against three stdin payloads: valid JSON (exit 0), invalid JSON (exit 2, stderr message), and a non-`.claude`/non-JSON path (exit 0, skipped) — all correct
-- `python3 .github/scripts/validate_claude_config.py` tested against the real `.claude/` dir (passes), then against deliberately broken JSON and a file with no frontmatter (both correctly caught, exit 1) — restored afterward
-- `/todo-next` and the `doc-sync-checker` agent are prompt-only; there's no automated way to "run" them outside a live session, so their correctness rests on the verified frontmatter schema, not a test run
+```
+<output>/.git-store/            # bare clone, not the live checkout
+<output>/.vscode/*.code-workspace
+<output>/features/<template>/   # one worktree per selection, against .git-store
+<output>/scripts/               # setup-env.sh, git-sync-all.sh, sync-templates.sh, health-check.sh
+<output>/.workspace-manifest.json
+<output>/README.md
+<output>/CLAUDE.md              # generated, summarises what's included
+<output>/todo.md                # post-generation manual-follow-up checklist
+```
+
+`scripts/` is deliberately several small files, not one script. `ProjectSetup-linux-os.py` in this repo is the cautionary example: five loosely related jobs in one file, and its `docs/` generation step is already broken against current repo state. Card 2 replaces that pattern rather than trimming it.
+
+## The Q&A flow
+
+Two distinct sessions, never collapsed into one turn:
+
+1. **Interview** (Card 2's `workspace-architect` subagent, via `/generate-workspace`): ask which templates, output path, Windows vs WSL2. Write a spec to this worktree's own `claude/N-Title.md`. Stop — do not generate anything yet.
+2. **Build** (a later session, after human review of the spec): read the reviewed `claude/N-*.md`, then actually run the bare-clone-and-worktree mechanism and write the output folder.
+
+The gap between the two is deliberate — it's the point where a misread requirement gets caught before any files exist on disk, the same role human review plays for this repo's own `claude/N-*.md` planning docs.
+
+## What gets written where (Card 1)
+
+- `features/vscode-workspace-gen` worktree, branch `vscode-gen`, off `claude-code-a` — done via `git worktree add features/vscode-workspace-gen -b vscode-gen claude-code-a`
+- `README.md` — what the tool does, the 4-step process, how to invoke it (plain-English today, `/generate-workspace` once Card 2 ships)
+- `CLAUDE.md` — the two-jobs framing (interviewing vs. generating), the VS Code-docs-check and Windows/WSL2 standing rules, the bare-clone mechanism, output shape, and an honest "not yet built" list so a session here doesn't assume Card 2's files already exist
+- `.claude/plan.md` — this file
+- Inherited unchanged from `claude-code-advance`: `.claude/commands/todo-next.md`, `.claude/agents/doc-sync-checker.md`, `.claude/settings.json` + `.claude/hooks/validate-json.sh`, `.github/` CI, `.gitignore`. Whether these generic examples stay, get removed, or get extended is a Card 2 decision, not this scaffold step's — Card 2 adds `generate-workspace.md`, `workspace-architect.md`, and a second, distinct hook (validates *generated* `.vscode/*.code-workspace`, not this template's own `.claude/*.json`) alongside them.
+- `todo.md` — deliberately left as inherited from `claude-code-advance` for now rather than rewritten; Card 1's checklist in `claude/7-Phase 6 Detailed Breakdown.md` doesn't call for a todo.md rewrite, and rewriting it before Card 2's real task list exists would just mean rewriting it twice
+
+## Deliberately deferred (not Card 1's job)
+
+- `.claude/commands/generate-workspace.md`, `.claude/agents/workspace-architect.md` — Card 2
+- The generated-output JSON-validation hook — Card 2
+- `scripts/generate-workspace.py` and the four generated-project scripts — Card 2
+- Running an actual generation end to end — Card 3
+- `.devcontainer/` generation — flagged in the process design doc as nice-to-have, not v1
+
+## Verification
+
+- `git worktree list` from the repo root shows `features/vscode-workspace-gen` on branch `vscode-gen`
+- `doc-sync-checker` run against this directory once README.md/CLAUDE.md/plan.md are in place, to catch any claim here that doesn't match what's actually on disk
+- No automated tests for this step — it's orientation documentation, not executable code
