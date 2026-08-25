@@ -1,7 +1,6 @@
-# Todo — claude-code-advance
+# Todo — vscode-workspace-gen
 
-> Advanced Claude Code configuration tasks. Uses the same symbol system as the base template.
-> See the Symbol Guide below for reference.
+> Workspace-generator-specific task tracking. Uses the same symbol system as `claude-code-advance`.
 
 ## Symbol Guide
 
@@ -21,80 +20,53 @@
 
 ---
 
-## Project Setup
+## Card 1 — Scaffold (done)
 
 ```markdown
-- [x] [!] Initialise git repository and branch (claude-code-a)
-- [x] [!] Remove stray requirements.txt / .python-version left from the generic stub — no runtime deps here
-- [x] Replace the all-Python .gitignore with one appropriate for this template
-- [ ] [@] Decide whether to merge claude-code-basic's base files (todo.md/README.md) again once basic changes, or let this template's docs diverge now that they're advanced-specific
+- [x] [!] Worktree + branch: features/vscode-workspace-gen, branch vscode-gen, off claude-code-a
+- [x] [!] README.md, CLAUDE.md, .claude/plan.md
 ```
 
 ---
 
-## Slash Commands
+## Card 2 — Generator content (done)
 
 ```markdown
-- [x] [!] .claude/commands/todo-next.md — reads todo.md, reports the next task by priority symbol
-- [ ] [ ] Design your next command:
-  - [ ] Frontmatter: description, argument-hint if it takes args, allowed-tools to scope permissions
-  - [ ] Body: a clear instruction, using $ARGUMENTS / $1 / named args from the `arguments` field as needed
-  - [ ] Decide if it should run in the main session or context: fork (isolated subagent)
-- [ ] [@] Decide on a naming convention once there are more than a couple commands (verb-noun vs. noun-verb)
+- [x] [!] .claude/commands/generate-workspace.md — /generate-workspace, interview or build by $ARGUMENTS
+- [x] [!] .claude/agents/workspace-architect.md — drafts claude/N-*.md, NEEDS-INPUT/DRAFT-READY contract
+- [x] [!] .claude/hooks/validate-workspace-json.sh + settings.json entry — checks generated *.code-workspace parses
+- [x] [!] scripts/generate-workspace.py — bare-clone + worktree mechanism, template discovery from root CLAUDE.md
+- [x] scripts/setup-env.sh, health-check.sh, sync-templates.sh, git-sync-all.sh — copied into generated output
+- [x] scripts/repair-worktrees.sh — not originally scoped; added after the move-breaks-worktrees finding (see plan.md)
 ```
 
 ---
 
-## Subagents
+## Card 3 — End-to-end test (next)
 
 ```markdown
-- [x] [!] .claude/agents/doc-sync-checker.md — read-only (Read, Grep, Glob), checks README/CLAUDE.md/todo.md consistency
-- [ ] [ ] Design your next subagent:
-  - [ ] Frontmatter: name, description (include "Use proactively" if it should auto-invoke), tools (comma-separated string, not a list), model
-  - [ ] Scope `tools` to the minimum the agent actually needs — doc-sync-checker has no Edit/Write on purpose
-  - [ ] Write the system prompt: role, when invoked, what to check/do, how to report back
-- [ ] [@] Decide which agents should be proactive (auto-invoked) vs. explicitly called
+- [ ] [!] Run a full /generate-workspace interview through a live Claude Code session (not just the script directly) — confirm workspace-architect's NEEDS-INPUT loop actually surfaces sane questions via AskUserQuestion
+- [ ] [!] Generate a sample selection into a real scratch output folder, outside /tmp churn — keep it around long enough to open in actual VS Code
+- [ ] Confirm .vscode/*.code-workspace opens correctly in VS Code, not just that it's valid JSON
+- [ ] Confirm Windows-path and WSL2-path target variants both produce sensible settings — test at least one directly, reason through the other if only one environment is available
+- [ ] Run scripts/health-check.sh against the generated project with dependencies actually installed, confirm it passes
+- [ ] [?] Decide whether scripts/repair-worktrees.sh needs a mention in the top-level coding-project-templates README, since the underlying "worktrees break on move" fact applies to this repo's own features/* too
 ```
 
 ---
 
-## Hooks
+## Known gaps / discussion
 
 ```markdown
-- [x] [!] .claude/settings.json — PostToolUse hook (matcher: Edit|Write) wired to .claude/hooks/validate-json.sh
-- [x] [!] .claude/hooks/validate-json.sh — validates .claude/*.json still parses after an edit; exit 2 surfaces feedback to Claude
-- [ ] [ ] Design your next hook:
-  - [ ] Pick the right event (PreToolUse to block before it happens, PostToolUse to catch/react after, Stop, SessionStart, etc.)
-  - [ ] Pick a matcher (tool name, pipe-separated alternation, or regex)
-  - [ ] Read the hook's stdin JSON payload for the fields you need (tool_name, tool_input, tool_result, ...)
-  - [ ] Exit 2 to block/give feedback; exit 0 for success; know your event's exact blocking semantics before relying on it
-- [ ] [@] Decide whether a hook should live as a one-line command in settings.json or call out to a script under .claude/hooks/ — validate-json.sh does the latter because the logic is too much for one line
-```
-
----
-
-## Multi-File Refactor Workflows
-
-```markdown
-- [ ] [@] Decide on a convention for large, multi-file changes: one command that fans out to subagents per file? A single session working sequentially? Depends on whether files are independent or coupled.
-- [ ] [?] Research context: fork on commands (runs the command in an isolated subagent) — worth using for a refactor step that shouldn't pollute the main session's context?
-- [ ] [ ] Once there's a real refactor workflow, document it here as a worked example, not just a placeholder
-```
-
----
-
-## CI / Validation
-
-```markdown
-- [x] [!] .github/scripts/validate_claude_config.py — validates .claude/*.json is valid JSON, command/agent frontmatter is valid YAML
-- [x] [!] .github/workflows/validate-config.yml — runs the validator on every push/PR
-- [ ] [#] Extend the validator once settings.json grows more hook types — same JSON-parses check covers all of them already, but a schema check (event names, matcher syntax) would catch more
+- [@] Phase 2's scripts/git-sync-all.sh was never built — this template's copy was written fresh instead of reused. Worth closing the loop: should the root repo now adopt this template's version verbatim, or does the root repo's own multi-worktree layout need something different?
+- [ ] [?] .devcontainer/ generation — flagged nice-to-have in the process design doc, not built, no todo item to build it yet
+- [ ] [@] Should generate-workspace.py support re-running against an existing output (add a template to an already-generated project) or is that out of scope for v1?
 ```
 
 ---
 
 ## Metadata
 
-*Last Updated: 2026-08-24*
-*Template Version: 1.0*
-*Stack: Claude Code (commands, subagents, hooks) — no runtime language deps*
+*Last Updated: 2026-08-25*
+*Template Version: 0.2*
+*Stack: Claude Code (commands, subagents, hooks) + Python 3 generator script*

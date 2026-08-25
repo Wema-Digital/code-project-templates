@@ -8,10 +8,10 @@ It builds a standalone, multi-template project folder: you pick which templates 
 
 ## Two jobs a session opened here might be doing
 
-A Claude Code session in this folder is always doing one of two things. Work out which before doing anything else:
+A Claude Code session in this folder is always doing one of two things, both entered via `/generate-workspace` (see `.claude/commands/generate-workspace.md`). Work out which before doing anything else:
 
-1. **Interviewing** — no `claude/N-*.md` spec exists yet for what the user wants. Ask: which templates, output path, target machine (native Windows or WSL2 — see below), any naming/branch preferences. Write the answers as a spec to `claude/N-Title.md` in *this worktree's own* `claude/` folder (not the root repo's) and stop there for review — this session does not generate files itself.
-2. **Generating** — a reviewed `claude/N-*.md` spec already exists. Read it, then actually build the output folder: bare-clone, worktrees, `.vscode/`, docs, scripts. This is the only case where this session writes into the output path.
+1. **Interviewing** (`/generate-workspace`, no arguments) — no `claude/N-*.md` spec exists yet for what the user wants. The `workspace-architect` subagent drafts the spec and reports back either `NEEDS-INPUT` (questions to put to the user) or `DRAFT-READY`; the main session is the one that actually asks the user, since subagents can't. Once the spec is written to `claude/N-Title.md` in *this worktree's own* `claude/` folder (not the root repo's), **stop there for review** — this mode never generates files itself.
+2. **Generating** (`/generate-workspace claude/N-title.md`) — a reviewed spec already exists. Runs `scripts/generate-workspace.py --spec ...`, which does the actual work: bare-clone, worktrees, `.vscode/`, docs, scripts. This is the only case where anything gets written into the output path.
 
 Never skip straight to generating from an interview in the same turn — the spec gets written, then reviewed, then built. That gap is deliberate: it is the user's chance to correct a misread requirement before any files exist on disk.
 
@@ -40,6 +40,7 @@ The fix: generate a fresh **bare clone of this repo inside the output folder** (
 │   └── <template>/         # git worktree per selected template, against .git-store
 ├── scripts/                 # small, single-purpose — see below, not one monolith
 ├── .workspace-manifest.json # which templates + commit/branch went in
+├── .gitignore                # excludes .git-store/ from any wrapper-level git init
 ├── README.md
 ├── CLAUDE.md                # generated, summarises what's included and how it was assembled
 └── todo.md                  # post-generation checklist: rename package, fill .env, add a remote
@@ -50,9 +51,10 @@ The fix: generate a fresh **bare clone of this repo inside the output folder** (
 This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five loosely related things in one file (env file, workspace file, csv, docs generation, debug/task config) and its docs generation is already broken. Don't repeat that shape here. Each generated script does one thing:
 
 - `setup-env.sh` — bootstraps whichever languages actually got included, not a one-size-assumes-Python script
-- `git-sync-all.sh` — status/commit/push across every worktree branch in the generated project; reused from this repo's own phase 2 version
-- `sync-templates.sh` — pulls upstream template improvements from `coding-project-templates` into the generated project's branches after the fact
+- `git-sync-all.sh` — status/push across every worktree branch in the generated project. The spec called this "reused from phase 2", but phase 2's own `scripts/git-sync-all.sh` was never actually built (its GitHub Project card is still "optional"/in progress) — this is a fresh implementation, not a reuse, written to the same brief
+- `sync-templates.sh` — pulls upstream template improvements from `coding-project-templates` into the generated project's branches after the fact (fast-forward only; a diverged branch is reported, not silently merged)
 - `health-check.sh` — smoke-tests that each included template's own test suite still passes
+- `repair-worktrees.sh` — not in the original spec list; added after discovering (see below) that moving a generated project breaks every worktree until this runs
 
 `.devcontainer/` generation is a nice-to-have flagged for later, not a v1 requirement — don't build it unless asked.
 
@@ -60,14 +62,27 @@ This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five
 
 | File | Purpose |
 |---|---|
+| `.claude/commands/generate-workspace.md` | `/generate-workspace [spec-path]` — interview flow (no args) or build step (spec path) |
+| `.claude/agents/workspace-architect.md` | Drafts and writes the `claude/N-*.md` spec; reports `NEEDS-INPUT`/`DRAFT-READY` since subagents can't ask the user directly |
+| `.claude/hooks/validate-workspace-json.sh` | `PostToolUse` — checks a hand-edited `*.code-workspace` file still parses |
 | `.claude/commands/todo-next.md` | Inherited from `claude-code-advance` — reads `todo.md`, reports the next task |
 | `.claude/agents/doc-sync-checker.md` | Inherited from `claude-code-advance` — checks README/CLAUDE.md/todo.md consistency |
 | `.claude/settings.json` + `.claude/hooks/validate-json.sh` | Inherited — validates `.claude/*.json` still parses after an edit |
+| `scripts/generate-workspace.py` | The core logic: bare-clone, worktrees, `.vscode/`, docs, manifest, copies the scripts below into the output |
+| `scripts/setup-env.sh` | Copied into generated output — bootstraps whichever languages got included |
+| `scripts/sync-templates.sh` | Copied into generated output — fast-forwards each included branch from `origin` |
+| `scripts/health-check.sh` | Copied into generated output — smoke-tests each included template's test suite |
+| `scripts/git-sync-all.sh` | Copied into generated output — status/push across every included worktree |
+| `scripts/repair-worktrees.sh` | Copied into generated output — fixes worktree links after the generated project is moved (see below) |
 | `.claude/plan.md` | This template's own construction plan (bare-clone mechanism, output shape, Q&A flow) |
 | `README.md` | What this tool does, the 4-step process, how to invoke it |
 | `CLAUDE.md` | This file |
 
-**Not yet built** (Phase 6, Card 2 — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root): `.claude/commands/generate-workspace.md` (starts the interview), `.claude/agents/workspace-architect.md` (asks the clarifying questions, writes the spec), a hook validating the *generated* `.vscode/*.code-workspace` is well-formed JSON (distinct from the inherited hook above, which only checks this template's own `.claude/*.json`), and the `scripts/generate-workspace.py` core logic plus the four generated-project scripts described above.
+**Not yet done** (Phase 6, Card 3 — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root): a full end-to-end run against a real output path with a human reviewing the interview output, confirming both Windows and WSL2 variants, and confirming `scripts/health-check.sh` passes against a real generated project.
+
+## A worktree caveat found while building this: moving a generated project breaks it
+
+Confirmed by hand while writing `scripts/generate-workspace.py`: `git worktree` links are absolute paths on *both* ends (the bare store's `worktrees/<name>/gitdir` and each `features/<name>/.git` file). The bare-clone mechanism above solves dependency on where `coding-project-templates` lives — it does not make the generated project itself immune to being moved. Moving or renaming a generated project after creation breaks every `features/<name>` (`fatal: not a git repository`) until `git worktree repair` runs against each one — which is exactly what `scripts/repair-worktrees.sh` does. This is standard git behavior, not a bug specific to this generator (this repo's own `features/*` worktrees would break the same way if `coding-project-templates` itself were moved), but it's easy to assume "standalone" means "movable" and it doesn't, automatically. Documented in the generated project's own `README.md`/`todo.md`, not just here.
 
 ## Repo conventions (from root CLAUDE.md)
 
