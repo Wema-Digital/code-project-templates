@@ -15,7 +15,11 @@ if [ ! -d "$GIT_STORE" ]; then
 fi
 
 echo "== Fetching from origin ($(git -C "$GIT_STORE" remote get-url origin)) =="
-git -C "$GIT_STORE" fetch origin
+# Explicit refspec, not just `fetch origin`: a bare clone's "origin" remote
+# has no fetch refspec configured by git itself, and a project generated
+# before this was discovered would still be missing it in its stored config.
+# Passing the refspec here works regardless of what's actually stored.
+git -C "$GIT_STORE" fetch origin '+refs/heads/*:refs/remotes/origin/*'
 
 UP_TO_DATE=()
 UPDATED=()

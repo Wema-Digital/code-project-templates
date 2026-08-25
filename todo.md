@@ -42,14 +42,15 @@
 
 ---
 
-## Card 3 — End-to-end test (next)
+## Card 3 — End-to-end test (done)
 
 ```markdown
-- [ ] [!] Run a full /generate-workspace interview through a live Claude Code session (not just the script directly) — confirm workspace-architect's NEEDS-INPUT loop actually surfaces sane questions via AskUserQuestion
-- [ ] [!] Generate a sample selection into a real scratch output folder, outside /tmp churn — keep it around long enough to open in actual VS Code
-- [ ] Confirm .vscode/*.code-workspace opens correctly in VS Code, not just that it's valid JSON
-- [ ] Confirm Windows-path and WSL2-path target variants both produce sensible settings — test at least one directly, reason through the other if only one environment is available
-- [ ] Run scripts/health-check.sh against the generated project with dependencies actually installed, confirm it passes
+- [x] [!] Generate a sample selection into a real scratch output folder — web-flask + python-scripts, kept around long enough to open in actual VS Code
+- [x] Confirm .vscode/*.code-workspace opens correctly in VS Code (code CLI), not just that it's valid JSON
+- [x] Confirm Windows-path and WSL2-path target variants both produce sensible settings — both generated for real; terminal.integrated.defaultProfile values re-verified against VS Code's current source
+- [x] [!] Confirm portability properly: generated from an isolated bare copy of the source, then deleted that copy entirely (stronger than "moved") — worktrees kept working, including a real test commit
+- [x] Run scripts/health-check.sh against the generated project with dependencies actually installed (via uv, no sudo needed), confirm it passes — required fixing two real bugs first, see plan.md's Card 3 addendum
+- [>] [!] Run a full /generate-workspace interview through a live Claude Code session opened in this worktree (not just the script directly) — this orchestrating session isn't opened in features/vscode-workspace-gen, so workspace-architect isn't in its own available-agent list; deferred to a manual pass by a human here
 - [ ] [?] Decide whether scripts/repair-worktrees.sh needs a mention in the top-level coding-project-templates README, since the underlying "worktrees break on move" fact applies to this repo's own features/* too
 ```
 

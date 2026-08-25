@@ -84,7 +84,7 @@ vscode-workspace-gen/
 └── README.md                           # this file
 ```
 
-Not yet done (Phase 6, Card 3 — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root): a full end-to-end run with a human reviewing real interview output, both Windows and WSL2 variants checked, and `scripts/health-check.sh` run against a real generated project. `scripts/generate-workspace.py` has been smoke-tested by hand (bare clone + worktrees + generated files all verified to work and be portable from the source repo; moving the *output* itself needs `repair-worktrees.sh`, documented above) but not run through Card 3's full checklist yet.
+Phase 6 complete — Card 3's full checklist ran for real: portability (deleted the isolated source copy entirely, not just moved it — generated worktrees kept working, including a real commit), both Windows and WSL2 target variants, `scripts/health-check.sh` passing clean against a real generated project, and the workspace file opening in VS Code. Testing surfaced and fixed two real bugs: three Phase 5 templates' own CI was silently broken (added `pytest.ini` to `python-scripts`, `web-flask`, `machine-learning`), and `scripts/sync-templates.sh` silently did nothing (`git clone --bare`'s `origin` remote lacks a fetch refspec by default — fixed in both `generate-workspace.py` and `sync-templates.sh`). Full account in `.claude/plan.md`'s Card 3 addendum. Not done: a literal live `/generate-workspace` interview through a separate Claude Code session opened in this worktree.
 
 ---
 
@@ -97,6 +97,6 @@ Useful prompts to get started:
 
 ---
 
-**Template Version**: 0.2 (Card 2 — generator content built, Card 3 end-to-end test pending)
+**Template Version**: 1.0 (Phase 6 complete — Cards 1, 2, 3 all executed and verified)
 **Last Updated**: 2026-08-25
 **Branch**: `vscode-gen` | **Stack**: Claude Code (commands, subagents, hooks) + Python 3 (generator script, PyYAML for `--spec` parsing) — no runtime deps for the template itself

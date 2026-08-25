@@ -53,13 +53,27 @@ def discover_templates(source_repo: Path) -> dict[str, str]:
     rather than hardcoded here, so this never drifts out of sync the way this
     repo's own docs have drifted before (see doc-sync-checker's whole reason
     for existing)."""
-    claude_md = source_repo / "CLAUDE.md"
-    if not claude_md.is_file():
-        raise SystemExit(f"error: {claude_md} not found -- is --source-repo pointing at coding-project-templates?")
+    claude_md_path = source_repo / "CLAUDE.md"
+    if claude_md_path.is_file():
+        claude_md_text = claude_md_path.read_text()
+    else:
+        # --source-repo may point at a bare repository (no working tree, so
+        # CLAUDE.md isn't a plain file) -- fall back to reading it straight
+        # out of the object database instead of assuming a checkout exists.
+        result = subprocess.run(
+            ["git", "-C", str(source_repo), "show", "HEAD:CLAUDE.md"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise SystemExit(
+                f"error: no CLAUDE.md found at {claude_md_path} or via 'git show HEAD:CLAUDE.md' in {source_repo} "
+                "-- is --source-repo pointing at coding-project-templates (working tree or bare)?"
+            )
+        claude_md_text = result.stdout
 
     templates: dict[str, str] = {}
     row_re = re.compile(r"^\|\s*`features/([\w.-]+)`\s*\|\s*`([\w.-]+)`\s*\|")
-    for line in claude_md.read_text().splitlines():
+    for line in claude_md_text.splitlines():
         m = row_re.match(line.strip())
         if m:
             name, branch = m.group(1), m.group(2)
@@ -115,6 +129,16 @@ def clone_bare_store(source_repo: Path, output: Path) -> Path:
     )
     if result.returncode != 0:
         run(["git", "-C", str(git_store), "remote", "add", "origin", str(source_repo)])
+    # `git clone --bare` does NOT configure a fetch refspec for the "origin"
+    # it creates (bare repos aren't expected to track a remote) -- confirmed
+    # by hand while testing sync-templates.sh: without this, `git fetch origin`
+    # updates FETCH_HEAD only and silently populates no refs/remotes/origin/*
+    # refs at all, so every branch in sync-templates.sh looks like "no
+    # matching origin/<branch>" even right after a successful-looking fetch.
+    run([
+        "git", "-C", str(git_store), "config", "remote.origin.fetch",
+        "+refs/heads/*:refs/remotes/origin/*",
+    ])
     return git_store
 
 

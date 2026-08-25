@@ -78,7 +78,7 @@ This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five
 | `README.md` | What this tool does, the 4-step process, how to invoke it |
 | `CLAUDE.md` | This file |
 
-**Not yet done** (Phase 6, Card 3 — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root): a full end-to-end run against a real output path with a human reviewing the interview output, confirming both Windows and WSL2 variants, and confirming `scripts/health-check.sh` passes against a real generated project.
+**Phase 6 complete** (Card 3 executed 2026-08-25 — see `.claude/plan.md`'s Card 3 addendum). Real end-to-end run confirmed: portability by deleting an isolated source copy entirely (not just moving it), both Windows/WSL2 target variants, `scripts/health-check.sh` passing clean against a real generated project, and the workspace file opening in VS Code. Found and fixed two real bugs along the way: three Phase 5 templates' CI was silently broken (missing `pytest.ini` `pythonpath`), and `sync-templates.sh` silently did nothing (`git clone --bare`'s `origin` remote has no fetch refspec by default). **Not done**: a literal live `/generate-workspace` interview through a separate real Claude Code session opened in this worktree — worth a manual pass if maximum confidence is wanted.
 
 ## A worktree caveat found while building this: moving a generated project breaks it
 

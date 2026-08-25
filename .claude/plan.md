@@ -1,6 +1,6 @@
 # Plan — vscode-workspace-gen
 
-> **Status**: Card 1 (scaffold) executed 2026-08-25. Card 2 (agents/hooks/scripts) executed 2026-08-25, see addendum below. Card 3 (end-to-end test) not started — see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root.
+> **Status**: Card 1 (scaffold), Card 2 (agents/hooks/scripts), and Card 3 (end-to-end test) all executed 2026-08-25 — see addenda below. Phase 6 complete; see `claude/7-Phase 6 Detailed Breakdown.md` at the repo root.
 
 ## Context
 
@@ -99,5 +99,38 @@ Executed 2026-08-25.
 - Moved the generated output to a new path by hand: every `features/<name>` broke (`fatal: not a git repository`) until `git worktree repair` ran — this is what motivated `repair-worktrees.sh`; confirmed the script fixes it
 - `.claude/hooks/validate-workspace-json.sh` tested against three stdin payloads (valid `.code-workspace`, invalid one, unrelated file) — exit 0/2/0 respectively, matching `validate-json.sh`'s established pattern
 - `.claude/settings.json` re-validated as JSON after adding the second hook entry
-- Subagent/command YAML frontmatter checked by hand against the verified schema from Phase 5 (flat `key: value` pairs, comma-separated `tools`, no `Edit`/`Write` beyond what's actually needed) — `.github/scripts/validate_claude_config.py` (this template's own CI check) could not be run locally in this session (no `pyyaml` available and the environment blocks installing it), so this is a manual check, not a CI-equivalent one; the committed CI workflow will run it for real on push
+- Subagent/command YAML frontmatter checked by hand against the verified schema from Phase 5 (flat `key: value` pairs, comma-separated `tools`, no `Edit`/`Write` beyond what's actually needed) — `.github/scripts/validate_claude_config.py` (this template's own CI check) could not be run locally in this session (no `pyyaml` available and the environment blocks installing it), so this is a manual check, not a CI-equivalent one; the committed CI workflow will run it for real on push. **Correction, found during Card 3**: `pyyaml` *was* available all along via `/usr/bin/python3` (`python3-yaml`, apt-installed system-wide) — `python3` on `PATH` in this session just resolved to this repo's own `.venv/bin/python3` first, which doesn't have it. `/usr/bin/python3 .github/scripts/validate_claude_config.py` runs fine.
 - **Not done**: an actual live `/generate-workspace` interview through a real Claude Code session (only the underlying script and the discover/validate logic were exercised directly) — that, plus both OS variants and `health-check.sh` against a real generated project, is Card 3's job
+
+---
+
+## Addendum: Card 3 — Test the generator end to end
+
+Executed 2026-08-25.
+
+### What was tested, and how
+
+- **Ran the CI config validator for real** (`/usr/bin/python3 .github/scripts/validate_claude_config.py`), sidestepping the `python3` PATH shadowing noted above — passed clean: 1 JSON file, 4 command/agent files.
+- **Portability, done properly**: made an isolated bare clone of the source repo in scratch space, generated a project from *that copy* (`--source-repo`), then deleted the copy entirely (not moved — deleted). Both `features/web-flask` and `features/python-scripts` in the generated output still worked fully afterward: `git status`, `git log`, and a real test commit all succeeded with the source gone. This is the actual claim the process design doc makes (independence from where `coding-project-templates` lives), tested for real rather than assumed.
+  - This required a small fix to `discover_templates()`: it only knew how to read `CLAUDE.md` as a plain file, which doesn't exist in a bare repo. Added a fallback to `git show HEAD:CLAUDE.md` so `--source-repo` works against either a working tree or a bare repo.
+- **Windows vs WSL2 settings**: re-verified the exact `terminal.integrated.defaultProfile.windows`/`.linux` values against VS Code's actual current source (`terminalProfiles.ts` on GitHub, not assumed from training knowledge) per this template's own standing rule — `"PowerShell"` and `"bash"` are still the correct, current auto-detected profile names. Generated both target variants for real; both produced valid, sensible JSON.
+- **Real dependency install + test run**: `python3 -m venv` fails in this sandbox (`ensurepip`/`python3.12-venv` not installed, and fixing that needs `sudo` — asked the user first rather than assuming it was fine to change system packages). Found `uv` already installed and already what created this repo's own `.venv` (visible in its `pyvenv.cfg`) — used `uv venv` + `uv pip install` instead, which needs no system changes at all. Confirmed real: `setup-env.sh`'s dependency-detection logic (`requirements-dev.txt` before `requirements.txt`, `pyproject.toml[dev]`, `package.json`) is validated as *logic*, even though this specific test run used `uv` rather than the stdlib `venv`+`pip` `setup-env.sh` actually calls.
+- **`scripts/health-check.sh` against a real generated project** (`web-flask` + `python-scripts`, per the checklist's own suggested pair): first run failed both templates with `ModuleNotFoundError`. Traced this to a genuine, pre-existing bug in three Phase 5 templates (`python-scripts`, `web-flask`, `machine-learning`), not in this generator — see below. After fixing it upstream and re-running `scripts/sync-templates.sh` to pull the fix into the already-generated project, `health-check.sh` passed clean, exit 0.
+- **`.vscode/*.code-workspace` opens correctly in VS Code**: opened the generated workspace file with the `code` CLI (available in this environment as the VS Code remote-cli) — loaded without error.
+
+### Bug found and fixed, outside this template: three Phase 5 templates' CI was silently broken
+
+`python-scripts`, `web-flask`, and `machine-learning` all import their own top-level package bare (`from scripts.csv_report import ...`, `from app import ...`, `from src.pipeline import ...`) with no `pytest.ini`/`pyproject.toml` `pythonpath` setting and no root `conftest.py`. Plain `pytest` — the exact command each template's own `.github/workflows/test.yml` runs — can't import them (`ModuleNotFoundError`); only `python -m pytest` works, because `-m` adds the current directory to `sys.path` itself and the bare `pytest` entrypoint doesn't. Confirmed this wasn't specific to being nested inside `coding-project-templates`'s worktree layout by reproducing it in a fully isolated copy with no git anywhere. Checked GitHub Actions directly: all three branches' most recent CI runs before this fix were genuinely `failure`, confirming this has been silently broken since Phase 5.
+
+Asked the user before touching three already-"Done" Phase 5 templates from a Phase 6 session — confirmed they wanted it fixed now rather than just documented. Added a one-line `pytest.ini` (`pythonpath = .`) to each of the three affected templates' own branches (`py-script`, `py-flask`, `py-ml`), verified real `pytest` passes on all three locally, pushed, and confirmed each branch's real CI went green. `web-django` (pytest-django handles `sys.path` itself) and `python-app` (proper `pip install -e .` via `pyproject.toml`) were unaffected — checked both explicitly rather than assuming.
+
+### Bug found and fixed, in this generator: `sync-templates.sh` silently did nothing
+
+While re-syncing the pytest.ini fix into the already-generated sample project to test `sync-templates.sh` for real, every branch reported "no matching origin/<branch>, skipping" despite `git fetch origin` appearing to succeed. Root cause: `git clone --bare` sets the new "origin" remote's URL but configures no fetch refspec (bare repos aren't expected to track a remote on their own) — my earlier `clone_bare_store()` only handled the URL, so `git fetch origin` with no refspec updated `FETCH_HEAD` but populated zero `refs/remotes/origin/*` refs, and every subsequent `show-ref --verify` check in `sync-templates.sh` failed silently. Fixed two ways: `clone_bare_store()` now explicitly sets `remote.origin.fetch` after creating the remote (fixes it for every project generated from now on), and `sync-templates.sh` now passes the refspec explicitly to `git fetch` itself (fixes it for projects already generated before this patch, without needing to regenerate them). Verified: re-ran `sync-templates.sh` against the Card 3 sample project after the fix, both branches fast-forwarded correctly.
+
+### Verification
+
+- `python3 -m py_compile` clean on the updated `generate-workspace.py`; `bash -n` clean on the updated `sync-templates.sh`
+- Full pipeline re-run end to end after all fixes: generate → `setup-env.sh` (via `uv`) → `health-check.sh` (clean pass, exit 0) → `sync-templates.sh` (correctly fast-forwards) → re-run `health-check.sh` again (still clean)
+- Everything above was exercised against real output on disk, not dry-run only
+- **Not done**: a literal live `/generate-workspace` slash-command interview through a separate real Claude Code session (this session isn't running inside `features/vscode-workspace-gen`, so `workspace-architect` isn't in its own available-agent list) — the underlying mechanics it depends on (subagent tool restrictions, the spec format, `generate-workspace.py`'s `--spec` path) were all verified directly instead. Worth a manual pass by a human opening a session there directly, if maximum confidence is wanted before calling Phase 6 fully closed.
