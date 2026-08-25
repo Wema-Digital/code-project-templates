@@ -1,0 +1,48 @@
+flowchart TD
+    subgraph Decisions["Three forks to settle first"]
+        D1["Git structure for features/:<br/>bare clone vs. direct worktree"]
+        D2["Fate of the ProjectSetup-linux-os.py monolith"]
+        D3["Build claude-code-advance's generic<br/>agent / subagent / hook examples first?"]
+    end
+
+    Decisions -->|settled| Gen["Generator built as features/vscode-workspace-gen<br/>branch: vscode-gen<br/>a customised claude-code-advance"]
+
+    Gen --> Interview["Interview agent asks:<br/>which templates, native Windows or WSL2"]
+
+    Interview --> Clone["Fresh bare clone written inside<br/>the output: .git-store/"]
+    Clone --> Worktrees["git worktree add per selected<br/>template, against that local clone<br/>not the live checkout"]
+
+    Interview --> VSCode["Write .vscode .code-workspace<br/>using workspaceFolder-relative paths"]
+
+    subgraph Output["Generated project folder — standalone"]
+        O1[".vscode/"]
+        O2["features/ — chosen templates,<br/>each its own git branch"]
+        O3["README.md"]
+        O4["scripts/"]
+        O5[".git-store/ — the bare clone"]
+    end
+
+    Worktrees --> O2
+    Worktrees --> O5
+    VSCode --> O1
+
+    O4 --> Scripts
+
+    subgraph Scripts["scripts/ — replaces the old monolith"]
+        S1["setup-env.sh"]
+        S2["git-sync-all.sh"]
+        S3["sync-templates.sh"]
+        S4["health-check.sh"]
+    end
+
+    Output --> Extras["Worth adding later:<br/>.workspace-manifest.json, root CLAUDE.md,<br/>todo.md, optional .devcontainer/"]
+
+    Extras --> Next["Once the forks are settled:<br/>Phase 6 Detailed Breakdown +<br/>update-github-project-phase6.sh"]
+
+    classDef decision fill:#f1e2d5,stroke:#b5541f,stroke-width:1.5px,color:#1b2430;
+    classDef resolve fill:#e0ede7,stroke:#2f6b52,stroke-width:1.5px,color:#1b2430;
+    classDef neutral fill:#ffffff,stroke:#c7d0da,stroke-width:1px,color:#1b2430;
+
+    class D1,D2,D3 decision;
+    class Clone,Worktrees,VSCode,Gen resolve;
+    class Interview,O1,O2,O3,O4,O5,S1,S2,S3,S4,Extras,Next neutral;

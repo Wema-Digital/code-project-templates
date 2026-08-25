@@ -1,0 +1,381 @@
+<title>Workspace Generator Blueprint</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #eef1f4;
+    --paper: #ffffff;
+    --ink: #1b2430;
+    --ink-soft: #4a5568;
+    --ink-faint: #8894a3;
+    --line: #c7d0da;
+    --line-soft: #dde3e9;
+    --accent: #b5541f;
+    --accent-soft: #f1e2d5;
+    --accent-ink: #7a3813;
+    --resolve: #2f6b52;
+    --resolve-soft: #e0ede7;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10151c;
+      --paper: #161d27;
+      --ink: #e8e6de;
+      --ink-soft: #aab3c0;
+      --ink-faint: #6b7684;
+      --line: #2b3644;
+      --line-soft: #212a36;
+      --accent: #e2955c;
+      --accent-soft: #3a2a1c;
+      --accent-ink: #f0b385;
+      --resolve: #6fbf9a;
+      --resolve-soft: #1c2e26;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10151c;
+    --paper: #161d27;
+    --ink: #e8e6de;
+    --ink-soft: #aab3c0;
+    --ink-faint: #6b7684;
+    --line: #2b3644;
+    --line-soft: #212a36;
+    --accent: #e2955c;
+    --accent-soft: #3a2a1c;
+    --accent-ink: #f0b385;
+    --resolve: #6fbf9a;
+    --resolve-soft: #1c2e26;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+  }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin-bottom: 0.9rem;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 1.6rem;
+    height: 1px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    font-optical-sizing: auto;
+    font-size: clamp(2rem, 4.2vw, 2.9rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 1.1rem;
+    color: var(--ink);
+  }
+
+  .lede {
+    max-width: 62ch;
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    margin: 0 0 2.6rem;
+  }
+
+  .lede code, p code, li code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.88em;
+    background: var(--line-soft);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  .sheet {
+    position: relative;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 2.4rem 1.6rem 1.8rem;
+    margin-bottom: 3rem;
+  }
+
+  .sheet::before,
+  .sheet::after,
+  .sheet .tick-br,
+  .sheet .tick-bl {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--ink-faint);
+    opacity: 0.6;
+  }
+  .sheet::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .sheet::after { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+  .sheet .tick-bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+  .sheet .tick-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .sheet-label {
+    position: absolute;
+    top: -0.65rem;
+    left: 1.4rem;
+    background: var(--paper);
+    padding: 0 0.6rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .sheet pre.mermaid {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+  }
+
+  h2 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    font-size: 1.3rem;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.9rem;
+    color: var(--ink);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.4rem;
+    margin: 0 0 2.6rem;
+    font-size: 0.86rem;
+    color: var(--ink-soft);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .swatch.decision { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+  .swatch.resolve { background: var(--resolve-soft); border: 1.5px solid var(--resolve); }
+  .swatch.neutral { background: var(--line-soft); border: 1.5px solid var(--line); }
+
+  section + section { margin-top: 2.6rem; }
+
+  .forks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .forks li {
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    gap: 0.9rem;
+    padding: 0.95rem 1.1rem;
+    background: var(--paper);
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+  }
+
+  .forks .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-ink);
+    padding-top: 0.1rem;
+  }
+
+  .forks strong {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+
+  .forks span {
+    color: var(--ink-soft);
+    font-size: 0.94rem;
+  }
+
+  .closing {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    padding: 1.1rem 1.2rem;
+    background: var(--resolve-soft);
+    border: 1px solid var(--resolve);
+    border-radius: 3px;
+    color: var(--ink);
+    font-size: 0.95rem;
+  }
+
+  .closing .mark {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--resolve);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--line-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .sheet { padding: 2.2rem 1rem 1.4rem; }
+  }
+</style>
+
+<div class="page">
+  <div class="eyebrow">Phase 6 &middot; Process Design Review</div>
+  <h1>The Workspace Generator, mapped end to end</h1>
+  <p class="lede">
+    From the three forks still open, through how <code>features/vscode-workspace-gen</code>
+    resolves the "standalone vs. still a worktree" tension, to the project folder it hands back.
+    Source: <code>claude/6-Phase 6 Process Design (review).md</code>.
+  </p>
+
+  <div class="sheet">
+    <span class="sheet-label">Process map</span>
+    <span class="tick-bl"></span><span class="tick-br"></span>
+    <pre class="mermaid">
+flowchart TD
+    subgraph Decisions["Three forks to settle first"]
+        D1["Git structure for features/:<br/>bare clone vs. direct worktree"]
+        D2["Fate of the ProjectSetup-linux-os.py monolith"]
+        D3["Build claude-code-advance's generic<br/>agent / subagent / hook examples first?"]
+    end
+
+    Decisions -->|settled| Gen["Generator built as features/vscode-workspace-gen<br/>branch: vscode-gen<br/>a customised claude-code-advance"]
+
+    Gen --> Interview["Interview agent asks:<br/>which templates, native Windows or WSL2"]
+
+    Interview --> Clone["Fresh bare clone written inside<br/>the output: .git-store/"]
+    Clone --> Worktrees["git worktree add per selected<br/>template, against that local clone<br/>not the live checkout"]
+
+    Interview --> VSCode["Write .vscode .code-workspace<br/>using workspaceFolder-relative paths"]
+
+    subgraph Output["Generated project folder — standalone"]
+        O1[".vscode/"]
+        O2["features/ — chosen templates,<br/>each its own git branch"]
+        O3["README.md"]
+        O4["scripts/"]
+        O5[".git-store/ — the bare clone"]
+    end
+
+    Worktrees --> O2
+    Worktrees --> O5
+    VSCode --> O1
+
+    O4 --> Scripts
+
+    subgraph Scripts["scripts/ — replaces the old monolith"]
+        S1["setup-env.sh"]
+        S2["git-sync-all.sh"]
+        S3["sync-templates.sh"]
+        S4["health-check.sh"]
+    end
+
+    Output --> Extras["Worth adding later:<br/>.workspace-manifest.json, root CLAUDE.md,<br/>todo.md, optional .devcontainer/"]
+
+    Extras --> Next["Once the forks are settled:<br/>Phase 6 Detailed Breakdown +<br/>update-github-project-phase6.sh"]
+
+    classDef decision fill:#f1e2d5,stroke:#b5541f,stroke-width:1.5px,color:#1b2430;
+    classDef resolve fill:#e0ede7,stroke:#2f6b52,stroke-width:1.5px,color:#1b2430;
+    classDef neutral fill:#ffffff,stroke:#c7d0da,stroke-width:1px,color:#1b2430;
+
+    class D1,D2,D3 decision;
+    class Clone,Worktrees,VSCode,Gen resolve;
+    class Interview,O1,O2,O3,O4,O5,S1,S2,S3,S4,Extras,Next neutral;
+    </pre>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="swatch decision"></span>Open decision, blocks the build</div>
+    <div class="legend-item"><span class="swatch resolve"></span>Recommended resolution</div>
+    <div class="legend-item"><span class="swatch neutral"></span>Downstream step or output</div>
+  </div>
+
+  <section>
+    <h2>The three forks</h2>
+    <ol class="forks">
+      <li>
+        <span class="num">01</span>
+        <span>
+          <strong>Git structure for features/</strong>
+          <span>A plain <code>git worktree add</code> against the live <code>coding-project-templates</code> checkout leaves the generated folder secretly tied to that path. The recommendation: clone a bare copy into <code>.git-store/</code> inside the output first, then add worktrees against that local clone.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <span>
+          <strong>Fate of the monolith</strong>
+          <span><code>ProjectSetup-linux-os.py</code> does five unrelated jobs in one file, and its docs generation is already broken. Recommendation: retire it in favour of four single-purpose scripts.</span>
+        </span>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <span>
+          <strong>Sequencing against claude-code-advance</strong>
+          <span>Whether claude-code-advance needs its own generic agent, subagent, and hook examples built out before vscode-workspace-gen is layered on top of it.</span>
+        </span>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="closing">
+      <span class="mark">&rarr;</span>
+      <span>Once these three are settled, <code>claude/7-Phase 6 Detailed Breakdown.md</code> and <code>scripts/update-github-project-phase6.sh</code> follow.</span>
+    </div>
+  </section>
+
+  <footer>
+    <span>wema.digital.code &middot; coding-project-templates &middot; claude/6-Phase 6 Process Design (review).md</span>
+    <span>Prepared 2026-08-23</span>
+  </footer>
+</div>
