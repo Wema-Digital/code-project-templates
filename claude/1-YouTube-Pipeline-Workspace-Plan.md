@@ -1,6 +1,6 @@
 # Workspace spec and rollout plan: youtube-pipeline
 
-Status: DRAFT-READY (all open items resolved 2026-08-29; output_path confirmed 2026-08-28; template collision resolved 2026-08-29; notion-integration scope + template resolved 2026-08-29)
+Status: BUILT 2026-08-29 — spec approved, Phases 0–2 done (repo + board + generated workspace at `/mnt/w/wema-studio/vscode_workspace/you_tube`, 6 branches pushed to `Wema-Digital/youtube-pipeline`). A generator bug surfaced and was fixed on the first real run (same-source-branch worktree collision — see `.claude/plan.md`). Next: Phase 3 content build-out.
 
 ## Summary
 
@@ -66,14 +66,14 @@ Scripts live in `rollout/youtube-pipeline/` (not `scripts/` — that folder is g
 
 - 1.1 ~~Resolve open item 2~~ DONE 2026-08-29 (this chat): notion-integration is a Notion-API interaction layer, not fully developed, going in as a scaffold; template locked to `python-app:notion-integration-app` + `claude-code-basic:notion-integration-agent`. Item 1 no longer applies, see Resolved above.
 - 1.2 DONE: `templates` / `output_path` / `project_name` / `target` all unambiguous; status above flipped to `DRAFT-READY`.
-- 1.3 Human review of the finished spec — the same review step that exists for the tool's own generation runs and for this repo's own `claude/N-*.md` docs. (Pending sign-off before running Phase 2.)
+- 1.3 ~~Human review of the finished spec~~ APPROVED 2026-08-29 — spec signed off, Phase 2 run.
 
 ## Phase 2: Build
 
-- 2.1 `python3 scripts/generate-workspace.py --spec claude/1-YouTube-Pipeline-Workspace-Plan.md` (or `--dry-run` first) from inside `features/vscode-workspace-gen`.
-- 2.2 `git remote add origin <Phase-0 repo URL>` against the generated `.git-store`, push every selected template's branch (the bare clone already carries full history per branch, confirmed in Card 3's portability test).
-- 2.3 `scripts/health-check.sh` against the generated output.
-- 2.4 `scripts/repair-worktrees.sh` is a known follow-up if this generated project is ever moved after Build; worth noting in its own `README.md`/`todo.md`, which `generate-workspace.py` already writes automatically.
+- 2.1 ~~`generate-workspace.py --spec ...`~~ DONE 2026-08-29. Run with `/usr/bin/python3` (has PyYAML; the repo `.venv` python does not). Output at `/mnt/w/wema-studio/vscode_workspace/you_tube`: 6 worktrees, `.vscode/youtube-pipeline.code-workspace` (valid JSON, `${workspaceFolder}`-relative, `terminal.integrated.defaultProfile.linux: bash` for wsl2), docs, manifest, copied scripts. **Found and fixed a real generator bug on the first run** — two selections resolving to the same source branch (`claude-code-b` ×2, `py-app` ×2) crashed `git worktree add` ("branch already used by worktree"). Fix: aliased selections now get a per-alias branch forked from the template branch. Full record in `.claude/plan.md`'s "Bug found and fixed 2026-08-29" under the NAME:ALIAS addendum.
+- 2.2 ~~push branches~~ DONE 2026-08-29. **Not `origin`** — `clone_bare_store` sets `origin` to the source repo for `sync-templates.sh`. Added remote `github` → `https://github.com/Wema-Digital/youtube-pipeline.git` on the generated `.git-store` and pushed all 6 component branches (`keyword-intelligence-agent`, `keyword-intelligence-scripts`, `production-pipeline-agent`, `production-pipeline-app`, `notion-integration-agent`, `notion-integration-app` — each now its own branch, names matching the folders). Repo default branch set to `keyword-intelligence-agent`; the transient `claude-code-a` GitHub auto-default was deleted. Push had to go one branch at a time (all 6 at once exceeded a 2-min timeout — each branch carries full `coding-project-templates` history).
+- 2.3 ~~`scripts/health-check.sh`~~ DONE 2026-08-29 — exit 0, all 6 worktrees skipped ("no known test setup") because no venvs exist yet. A meaningful pass needs `scripts/setup-env.sh` first (creates per-worktree venvs + installs deps); that's the real next action and has an environment wrinkle — `setup-env.sh` calls bare `python3`, which resolves to the repo `.venv` python here, not a clean interpreter. Card 3 accepted the skip-level result as the Phase 2.3 bar.
+- 2.4 `scripts/repair-worktrees.sh` is a known follow-up if this generated project is ever moved after Build. `generate-workspace.py` already writes that note into the generated `README.md`/`todo.md`; confirmed present.
 
 ## Phase 3: Content build-out (the actual pipeline logic, outside the generator's own scope)
 

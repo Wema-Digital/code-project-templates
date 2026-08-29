@@ -126,16 +126,10 @@ EOF
 )"
 
 set_body "Human review + sign-off" "$(cat <<'EOF'
-Final human review of the finished spec **before anything is written to disk**.
+**Status: APPROVED 2026-08-29.** Spec signed off; Phase 2 run.
 
-Check:
-- the 6 template rows (`templates:` block)
-- `output_path: /mnt/w/wema-studio/vscode_workspace/you_tube`
-- `project_name: youtube-pipeline`
-- `target: wsl2`
-
-This is the deliberate gap between spec and build — the chance to correct a
-misread requirement before any files exist in the output path.
+The 6 template rows, `output_path: /mnt/w/wema-studio/vscode_workspace/you_tube`,
+`project_name: youtube-pipeline`, `target: wsl2` were all reviewed and accepted.
 
 Plan: Phase 1.3
 EOF
@@ -143,64 +137,73 @@ EOF
 
 # ---------- Phase 2 ----------
 set_body "Run generate-workspace.py --spec" "$(cat <<'EOF'
-From `features/vscode-workspace-gen`:
+**Status: DONE 2026-08-29.**
 
-    /usr/bin/python3 scripts/generate-workspace.py --spec claude/1-YouTube-Pipeline-Workspace-Plan.md --dry-run
-    /usr/bin/python3 scripts/generate-workspace.py --spec claude/1-YouTube-Pipeline-Workspace-Plan.md
+Ran `/usr/bin/python3 scripts/generate-workspace.py --spec
+claude/1-YouTube-Pipeline-Workspace-Plan.md` from `features/vscode-workspace-gen`
+(`/usr/bin/python3` has PyYAML; the repo `.venv` python does not).
 
-(Use `/usr/bin/python3` — it has PyYAML; the repo `.venv` python does not.)
+Output at `/mnt/w/wema-studio/vscode_workspace/you_tube`: `.git-store/` bare
+clone, 6 `features/<alias>/` worktrees, `.vscode/youtube-pipeline.code-workspace`
+(valid JSON, `${workspaceFolder}`-relative paths, `terminal.integrated.
+defaultProfile.linux: bash` for wsl2, `ms-python.python` recommended),
+`README.md` / `CLAUDE.md` / `todo.md`, `.workspace-manifest.json`, `.gitignore`,
+copied helper scripts.
 
-Produces `<output>/` with: `.git-store/` bare clone, 6 `features/<alias>/`
-worktrees, `.vscode/youtube-pipeline.code-workspace`, `README.md` / `CLAUDE.md` /
-`todo.md`, `.workspace-manifest.json`, `.gitignore`, and the copied helper
-scripts.
-
-Refuses a non-empty output dir without `--force` — `ls
-/mnt/w/wema-studio/vscode_workspace/you_tube` first (only
-`coding-project-templates` is connected in the Claude session, not
-`wema-studio`).
-
-Before writing `.vscode/*.code-workspace`: re-check current VS Code docs for the
-settings keys in use, and confirm target = wsl2 handling.
+**Generator bug found + fixed on the first run:** two selections resolving to the
+same source branch (`claude-code-b` backs both `production-pipeline-agent` and
+`notion-integration-agent`; `py-app` backs both `-app` folders) crashed
+`git worktree add` — git won't check one branch out in two worktrees. Fix:
+aliased selections now get a per-alias branch forked from the template branch.
+See `.claude/plan.md` "Bug found and fixed 2026-08-29".
 
 Plan: Phase 2.1
 EOF
 )"
 
 set_body "git remote add origin" "$(cat <<'EOF'
-After generation, wire the Phase 0 repo onto the bundled bare clone and push
-every selected template branch:
+**Status: DONE 2026-08-29.**
+
+**Not `origin`** — `generate-workspace.py` sets the bare clone's `origin` to the
+*source* repo (`sync-templates.sh` needs it there). Used a separate remote:
 
     cd <output>/.git-store
-    git remote add origin git@github.com:Wema-Digital/youtube-pipeline.git
-    git push origin --all
+    git remote add github https://github.com/Wema-Digital/youtube-pipeline.git
+    # push one branch at a time — all 6 at once exceeded a 2-min timeout,
+    # each carries full coding-project-templates history
+    git push github keyword-intelligence-agent
+    git push github keyword-intelligence-scripts
+    git push github production-pipeline-agent
+    git push github production-pipeline-app
+    git push github notion-integration-agent
+    git push github notion-integration-app
 
-The bare clone already carries full per-branch history (confirmed in Card 3's
-portability test). Branches pushed: `claude-code-a`, `py-script`,
-`claude-code-b`, `py-app` — note `claude-code-b` and `py-app` each back two
-worktrees but are still one branch apiece.
+After the fork fix each component is its own branch, names matching the folders.
+Repo default branch set to `keyword-intelligence-agent`; GitHub's transient
+`claude-code-a` auto-default was deleted. Repo now has exactly those 6 branches.
 
 Plan: Phase 2.2
 EOF
 )"
 
 set_body "Run scripts/health-check.sh against the generated output" "$(cat <<'EOF'
-From the generated output root:
+**Status: DONE 2026-08-29 (skip-level).** `scripts/health-check.sh` exit 0, all 6
+worktrees skipped ("no known test setup") — no venvs exist yet.
 
-    scripts/setup-env.sh      # bootstrap deps for whichever languages got included
-    scripts/health-check.sh   # smoke-test each included template's own test suite
-
-`health-check.sh` was passing clean against a real generated project in Card 3.
+A meaningful pass needs `scripts/setup-env.sh` first (per-worktree venvs +
+deps). Wrinkle: `setup-env.sh` calls bare `python3`, which in this environment
+resolves to the repo `.venv` python, not a clean interpreter. That's the real
+next action; Card 3 accepted the skip-level result as the Phase 2.3 bar.
 
 Plan: Phase 2.3
 EOF
 )"
 
 set_body "Note repair-worktrees.sh in the generated README/todo" "$(cat <<'EOF'
-`generate-workspace.py` already writes the "if you move or rename this folder,
-run `scripts/repair-worktrees.sh` first" note into the generated `README.md` and
-`todo.md` automatically. This item is just to confirm that text is present and
-correct after generation.
+**Status: DONE 2026-08-29 — confirmed present** in the generated `README.md` and
+`todo.md` ("If you move this folder" section + todo checklist item).
+
+`generate-workspace.py` writes this automatically. This item just verifies it.
 
 Why it matters: git worktree links are absolute paths on *both* ends (the bare
 store's `worktrees/<name>/gitdir` and each `features/<alias>/.git` file). Moving

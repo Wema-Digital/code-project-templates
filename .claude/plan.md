@@ -164,3 +164,18 @@ That workspace needs three independent agent-plus-Python pairings (a keyword-int
 - A real (non-dry-run) generation with three aliased selections (two of them reusing `claude-code-basic` and `python-app`'s already-tested-once template family) produced correct output end to end: `features/<alias>` worktrees each checked out the right branch (confirmed via `git rev-parse --abbrev-ref HEAD` per folder), `.workspace-manifest.json`, the generated `README.md`, and the generated `CLAUDE.md` all correctly distinguished folder name from source template, and `scripts/health-check.sh` ran against the aliased output without error (skipped, as expected, since no dependencies were installed).
 - Confirmed by reading them that `setup-env.sh`, `health-check.sh`, `sync-templates.sh`, `git-sync-all.sh`, and `repair-worktrees.sh` all already iterate `features/*/` and derive each worktree's branch live via `git rev-parse --abbrev-ref HEAD` rather than assuming folder name equals template name -- none of the four generated-project scripts needed any change for aliasing to work.
 - Not done: an actual live `/generate-workspace` interview producing an aliased spec through a real Claude Code session opened in this worktree (same gap Card 3 already flagged for the non-aliased case).
+
+### Bug found and fixed 2026-08-29 (during the first real downstream generation)
+
+The verification above was **incomplete and its "end to end" claim was wrong**: the three-aliased-selection test that "produced correct output end to end" used three selections resolving to three *different* source branches. The `youtube-pipeline` spec (`claude/1-YouTube-Pipeline-Workspace-Plan.md`) is the first case where **two selections resolve to the same source branch** -- `claude-code-basic` backs both `production-pipeline-agent` and `notion-integration-agent`, and `python-app` backs both `production-pipeline-app` and `notion-integration-app`.
+
+`add_worktrees` did `git worktree add <path> <branch>` for every selection. git **refuses to check the same branch out in two worktrees at once**, so the first real generation of the six-worktree spec crashed on the fifth worktree:
+
+```
+fatal: 'claude-code-b' is already used by worktree at '.../features/production-pipeline-agent'
+subprocess.CalledProcessError: ... 'worktree', 'add', '.../features/notion-integration-agent', 'claude-code-b'] returned non-zero exit status 128
+```
+
+**Fix:** `add_worktrees` now creates a per-alias branch for any aliased selection (`s.alias != s.template`, plus a `Counter` guard for a same-branch collision without distinct aliases): `git worktree add -b <alias> <path> <source-branch>`. It returns a second dict `{alias: branch_actually_checked_out}`; `write_manifest` (new `source_branch` key alongside `branch`) and `write_claude_md` (Branch column now shows the per-folder branch; an extra paragraph explains the fork when any occurred) were updated to use it. A plain un-aliased selection is unchanged -- still a straight checkout of its template branch.
+
+**Verified:** clean `py_compile`; regenerated the full six-worktree `youtube-pipeline` spec non-dry-run -- all six worktrees created, each on its own branch matching its folder name (`git worktree list` confirmed), manifest records `branch` + `source_branch` correctly, generated `CLAUDE.md` table + fork paragraph correct, `health-check.sh` exit 0 (all skipped, no deps). All six branches then pushed to `Wema-Digital/youtube-pipeline` and the generated `.git-store` given a `github` remote (kept separate from `origin`, which `sync-templates.sh` needs pointed at the source repo).
