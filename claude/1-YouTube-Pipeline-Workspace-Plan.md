@@ -1,6 +1,6 @@
 # Workspace spec and rollout plan: youtube-pipeline
 
-Status: draft, NEEDS-INPUT (1 open item blocks Build; output_path confirmed 2026-08-28; template collision resolved 2026-08-29)
+Status: DRAFT-READY (all open items resolved 2026-08-29; output_path confirmed 2026-08-28; template collision resolved 2026-08-29; notion-integration scope + template resolved 2026-08-29)
 
 ## Summary
 
@@ -13,13 +13,14 @@ First real use of `vscode-workspace-gen` since Phase 6 closed. Builds the local,
 - The checklist's "notion workspace" item is a Notion.so API integration: a starter-template pairing (agent plus Python) built to work with the `notion.so` Python client library, not the ownership map's `00_keyword-intelligence`. `00_keyword-intelligence` was offered as the worked example of what "an agent, and a python project" looks like for a `claude code` component, not as the notion component itself.
 - First GitHub step creates both a repository and a Project board (mirroring `scripts/setup-github-project.sh`'s pattern for `coding-project-templates` itself: Phase field, seeded tasks).
 - Template collision (open item 1 below) resolved: `generate-workspace.py` now accepts `NAME:ALIAS` entries in `templates:`, so the same template can be selected more than once under distinct folder names. Full change and verification recorded in `.claude/plan.md`'s "Addendum: NAME:ALIAS support" (2026-08-29).
+- Notion-integration scope (open item 2 below) resolved: the integration is a general Notion-API interaction layer for working with Notion workspaces; the project is not yet fully developed, so it goes in as a scaffold to grow into. Template choice confirmed 2026-08-29 as `python-app` (not `python-scripts`) — real package structure is expected as the integration matures — paired with a `claude-code-basic` agent.
 
-## Open items (NEEDS-INPUT)
+## Open items
 
-Item 1 is resolved. Item 2 still blocks Build (well, blocks locking in the notion-integration row of `templates:` below; the other four rows are settled).
+All items resolved. Build is unblocked.
 
 1. ~~**Template collision.**~~ RESOLVED 2026-08-29: `generate-workspace.py` now accepts `NAME:ALIAS` selections (e.g. `claude-code-basic:notion-agent`), so the same template can back more than one component without colliding on `features/<name>`. Verified with a real end-to-end generation of three aliased worktrees; see `.claude/plan.md`'s addendum for the full change and test record.
-2. **Notion-integration's actual job.** Confirmed it should exist and should use the `notion.so` Python library and API, but not yet what it reads or writes, or where it sits in the v8 diagram's flow (a fourth workbook mirror? a content-calendar sync? something else). Needed before the notion-integration row of the spec below is more than a placeholder, and before any real content build-out in Phase 3. Does not block Phase 0 or generating the other four worktrees.
+2. ~~**Notion-integration's actual job.**~~ RESOLVED 2026-08-29: it is a general Notion-API interaction layer for Notion workspaces, not yet fully developed. It goes in now as a scaffold (a `claude-code-basic` agent + a `python-app` Python module built against the `notion-client` library); its precise reads/writes and its place in the v8 diagram flow are deferred to Phase 3 content build-out. `python-app` chosen over `python-scripts` because the integration is expected to grow into a real package.
 
 Not blocking, but worth a conscious decision rather than a silent default:
 
@@ -34,8 +35,8 @@ templates:
   - python-scripts:keyword-intelligence-scripts       # append_snapshot.py and Keyword Bank utilities (A3, A5's Search Volume normalisation)
   - claude-code-basic:production-pipeline-agent       # interactive, no standing Routine, human present every stage
   - python-app:production-pipeline-app                # workbook builders (openpyxl, find_row() write-back, SEO refresh check)
-  - claude-code-basic:notion-integration-agent        # PLACEHOLDER pending open item 2 -- interactive agent assumed, not a standing Routine
-  - python-scripts:notion-integration-scripts         # PLACEHOLDER pending open item 2 -- python-scripts assumed over python-app until scope is known
+  - claude-code-basic:notion-integration-agent        # interactive agent (no standing Routine) for driving the Notion-API layer
+  - python-app:notion-integration-app                 # Notion-API interaction module, built against notion-client; scaffold to grow into (scope firms up in Phase 3)
 output_path: /mnt/w/wema-studio/vscode_workspace/you_tube
 project_name: youtube-pipeline
 target: wsl2
@@ -46,23 +47,26 @@ target: wsl2
 - `output_path` confirmed 2026-08-28: base is `W:/wema-studio/`, translated to the WSL2 mount `/mnt/w/wema-studio/vscode_workspace/you_tube` (the ownership map's own tree root). Still not verified for existence or emptiness from this session, since only `coding-project-templates` is connected here, not `wema-studio` -- `generate-workspace.py` refuses a non-empty output dir without `--force`, so a quick `ls` before Build is worth doing.
 - Suggested GitHub repo name: `youtube-pipeline` (kebab-case, matches `code-project-templates`'s own naming). Open to a different name.
 - `gh` is authenticated in the user's own terminal, not in this session's `device_bash` environment (different shell/PATH, per this repo's own memory notes) -- any GitHub-creating script below is delivered for the user to run, same constraint as the existing `scripts/*.sh` in this repo.
-- The two `notion-integration-*` rows in the draft spec are placeholders (`claude-code-basic` + `python-scripts`), not a settled decision -- swap either template, or drop the `python-scripts` choice for `python-app` if the integration turns out to need real package structure, once open item 2 answers what it actually does.
+- The two `notion-integration-*` rows are now settled: `claude-code-basic:notion-integration-agent` + `python-app:notion-integration-app`. The `python-app` choice anticipates the integration growing into a real package; its concrete job (what it reads/writes in Notion, where it plugs into the v8 flow) is still open and lands in Phase 3, but that no longer blocks Build — the worktree goes in as a scaffold.
 
 ---
 
 # End-to-end rollout plan
 
-## Phase 0: GitHub repository and Project board
+## Phase 0: GitHub repository and Project board — DONE 2026-08-29
 
-- 0.1 Write a `setup-github-repo-youtube-pipeline.sh`, modelled on `scripts/setup-github-project.sh`: `gh repo create Wema-Digital/youtube-pipeline`, default branch `main`, branch protection matching the existing convention.
-- 0.2 Write a Project-board script (or extend `setup-github-project.sh`'s pattern) for a new board scoped to this repo: a Phase field covering this plan's phases (0 to 4 below) instead of `coding-project-templates`'s own six.
-- 0.3 User runs both scripts (their terminal has `gh` auth). Claude then verifies structure: `gh repo view`, `gh project list --owner Wema-Digital`, confirm the Phase field and seeded tasks match what the scripts intended, the same "check project structure" verification already used for `coding-project-templates`'s own GitHub Project.
+Scripts live in `rollout/youtube-pipeline/` (not `scripts/` — that folder is generator machinery copied into output; these are one-off rollout provisioning).
+
+- 0.1 ~~Write `setup-github-repo-youtube-pipeline.sh`~~ DONE. Repo **`Wema-Digital/youtube-pipeline`** created: private, wiki disabled, empty (default branch resolves to `main` on the Phase 2.2 push). https://github.com/Wema-Digital/youtube-pipeline
+  - **Branch protection: NOT applied — known limitation.** `Wema-Digital` is on GitHub's free plan, which allows neither branch-protection rules nor rulesets on *private* repos ("Upgrade to GitHub Pro or make this repository public"). Decision 2026-08-29: keep the repo private, accept no branch protection for now, revisit only if the org upgrades to Team. The script's "re-run after the Phase 2.2 push" fallback does not apply while the repo stays private on this plan.
+- 0.2 ~~Write the Project-board script~~ DONE. `setup-github-project-youtube-pipeline.sh` created **Project #3 "YouTube Pipeline: Rollout"**, linked to the repo, with a `Phase` single-select field (options Phase 0–4) and 19 seeded task items (3 / 2 / 5 / 6 / 3 across the phases). https://github.com/orgs/Wema-Digital/projects/3
+- 0.3 ~~Verify structure~~ DONE. `gh repo view` and `gh project view 3` confirm: repo private+empty, Phase field has exactly the 5 expected options, 19 items distributed across phases matching the script's intent.
 
 ## Phase 1: Interview
 
-- 1.1 Resolve open item 2 above (this chat, or a live `/generate-workspace` session opened inside `features/vscode-workspace-gen`, since Card 3's own todo flags that a real live interview through a Claude Code session has never actually been run) -- item 1 no longer applies, see Resolved above.
-- 1.2 Once resolved, `workspace-architect` (or this document, updated) reaches `templates` / `output_path` / `project_name` / `target` all unambiguous, and reports `DRAFT-READY` in place of this file's current `NEEDS-INPUT` status.
-- 1.3 Human review of the finished spec, the same review step that exists for the tool's own generation runs and for this repo's own `claude/N-*.md` docs.
+- 1.1 ~~Resolve open item 2~~ DONE 2026-08-29 (this chat): notion-integration is a Notion-API interaction layer, not fully developed, going in as a scaffold; template locked to `python-app:notion-integration-app` + `claude-code-basic:notion-integration-agent`. Item 1 no longer applies, see Resolved above.
+- 1.2 DONE: `templates` / `output_path` / `project_name` / `target` all unambiguous; status above flipped to `DRAFT-READY`.
+- 1.3 Human review of the finished spec — the same review step that exists for the tool's own generation runs and for this repo's own `claude/N-*.md` docs. (Pending sign-off before running Phase 2.)
 
 ## Phase 2: Build
 
@@ -78,7 +82,7 @@ Mapped to the ownership map's own "Still outstanding" list and the v8 diagram:
 - 3.1 `00_keyword-intelligence`: `append_snapshot.py` (A3), the `<750` Search Volume gate and `Insufficient Volume` tag (A_VOL/A_INSUFF), the A5 auto-compute formula once volume is normalised, the Claude Code Routine config itself (worktree toggle on, biweekly schedule).
 - 3.2 `production_pipeline`: build the `W2` (Series Candidates Workbook) and `W3` (Singles Tracker Workbook) skeletons, both still flagged "needs to be built"; the `find_row()` label-scan write-back between `S1` and `W1`/`W3`; the `SEO_CHECK` refresh logic against the Keyword Bank.
 - 3.3 `A7`'s lane and health clustering logic: still the "unopened box" per the ownership map, needed before `C1` (which depends on it) can run for real. This is a design task, not just an implementation one, and should probably get its own short spec before code.
-- 3.4 Notion-integration: blocked on open item 2 above.
+- 3.4 Notion-integration: the worktree exists after Phase 2 as a scaffold. Phase 3 work is defining its concrete job — what it reads/writes in Notion, and where (if anywhere) it plugs into the v8 flow — then building the `notion-client` calls in `features/notion-integration-app/` and the driving agent in `features/notion-integration-agent/`. Likely wants its own short spec before code.
 - 3.5 `OPT1` (Unclaimed Backlog sheet): still an open yes/no per the ownership map, independent of everything else here.
 
 ## Phase 4: Verification and the Cowork Project checklist item
