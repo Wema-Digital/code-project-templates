@@ -14,6 +14,15 @@ Usage:
     generate-workspace.py --spec claude/2-my-app.md [--dry-run]
     generate-workspace.py --templates web-flask,python-scripts \\
         --output ~/projects/my-app --project-name my-app --target wsl2 [--dry-run]
+
+Each --templates entry (or each item in a --spec's `templates:` list) may be
+either `NAME` or `NAME:ALIAS`. Use `NAME:ALIAS` when you want the same
+template included more than once in one output, for example two independent
+claude-code-basic agents backing two unrelated components: the worktree still
+checks out `NAME`'s branch and history, but lands in `features/<ALIAS>`
+instead of `features/<NAME>`, so it doesn't collide with another selection of
+the same template. Aliases must be unique within one generation, and must
+still be a safe folder name (letters, digits, `.`, `_`, `-`).
 """
 from __future__ import annotations
 
@@ -24,10 +33,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 VALID_TARGETS = ("wsl2", "windows")
 
-# Extensions worth recommending per selected template, keyed by folder name.
+# Extensions worth recommending per selected template, keyed by the template
+# itself (not the alias) -- an aliased worktree still runs the same stack.
 EXTENSION_RECOMMENDATIONS = {
     "web-flask": ["ms-python.python"],
     "python-app": ["ms-python.python"],
@@ -40,6 +51,15 @@ EXTENSION_RECOMMENDATIONS = {
     "claude-code-advance": [],
     "wsl-scripts": ["timonwong.shellcheck"],
 }
+
+
+class Selection(NamedTuple):
+    """One resolved --templates/spec entry: the folder it will be written to
+    (alias, defaults to template when no :alias was given), the source
+    template it comes from, and the branch that template lives on."""
+    alias: str
+    template: str
+    branch: str
 
 
 def repo_root_from_script() -> Path:
@@ -81,7 +101,7 @@ def discover_templates(source_repo: Path) -> dict[str, str]:
                 continue  # the generator itself is not a selectable output template
             templates[name] = branch
     if not templates:
-        raise SystemExit(f"error: no template rows found in {claude_md}'s Worktree map -- table format may have changed")
+        raise SystemExit(f"error: no template rows found in {claude_md_path}'s Worktree map -- table format may have changed")
     return templates
 
 
@@ -102,13 +122,48 @@ def parse_spec(spec_path: Path) -> dict:
     return data
 
 
-def validate_selection(templates: list[str], target: str, available: dict[str, str]) -> None:
-    unknown = [t for t in templates if t not in available]
+def parse_template_selections(tokens: list[str], available: dict[str, str]) -> list[Selection]:
+    """Resolve each `NAME` or `NAME:ALIAS` token against the available
+    templates. Alias defaults to the template name when omitted. Every alias
+    across the whole list must be unique -- that's what actually avoids the
+    features/<name> folder collision that motivated :ALIAS in the first
+    place, so it's checked here rather than left to git worktree add to fail
+    on later with a much less clear error."""
+    selections: list[Selection] = []
+    seen_aliases: dict[str, str] = {}  # alias -> the token that claimed it
+    unknown: list[str] = []
+
+    for token in tokens:
+        name, sep, alias = token.partition(":")
+        name = name.strip()
+        alias = alias.strip() if sep else name
+        if not name or (sep and not alias):
+            raise SystemExit(f"error: malformed template selection {token!r} -- expected NAME or NAME:ALIAS")
+        if not re.fullmatch(r"[\w.-]+", alias):
+            raise SystemExit(
+                f"error: alias {alias!r} in {token!r} is not a safe folder name "
+                "(letters, digits, '.', '_', '-' only)"
+            )
+        if name not in available:
+            unknown.append(name)
+            continue
+        if alias in seen_aliases:
+            raise SystemExit(
+                f"error: alias {alias!r} is claimed by both {seen_aliases[alias]!r} and {token!r} -- "
+                "each selection needs its own folder name, give one of them an explicit NAME:ALIAS"
+            )
+        seen_aliases[alias] = token
+        selections.append(Selection(alias=alias, template=name, branch=available[name]))
+
     if unknown:
         valid = ", ".join(sorted(available))
         raise SystemExit(f"error: unknown template(s) {unknown} -- valid choices are: {valid}")
-    if not templates:
+    if not selections:
         raise SystemExit("error: no templates selected")
+    return selections
+
+
+def validate_target(target: str) -> None:
     if target not in VALID_TARGETS:
         raise SystemExit(f"error: target must be one of {VALID_TARGETS}, got {target!r}")
 
@@ -142,22 +197,25 @@ def clone_bare_store(source_repo: Path, output: Path) -> Path:
     return git_store
 
 
-def add_worktrees(git_store: Path, output: Path, templates: dict[str, str]) -> dict[str, str]:
-    """Returns {template_name: short_commit_sha} for the manifest."""
+def add_worktrees(git_store: Path, output: Path, selections: list[Selection]) -> dict[str, str]:
+    """Returns {alias: short_commit_sha} for the manifest. Each worktree is
+    added at features/<alias> but checks out <template>'s actual branch --
+    the alias only ever affects the folder name, never which branch or
+    history ends up in it."""
     commits = {}
-    for name, branch in templates.items():
-        dest = output / "features" / name
-        run(["git", "-C", str(git_store), "worktree", "add", str(dest), branch])
+    for s in selections:
+        dest = output / "features" / s.alias
+        run(["git", "-C", str(git_store), "worktree", "add", str(dest), s.branch])
         sha = subprocess.run(
             ["git", "-C", str(dest), "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        commits[name] = sha
+        commits[s.alias] = sha
     return commits
 
 
-def write_workspace_file(output: Path, project_name: str, templates: list[str], target: str) -> Path:
-    folders = [{"path": f"features/{name}"} for name in templates]
+def write_workspace_file(output: Path, project_name: str, selections: list[Selection], target: str) -> Path:
+    folders = [{"path": f"features/{s.alias}"} for s in selections]
     settings = {
         "files.exclude": {"**/.git-store": True},
         "search.exclude": {"**/.git-store": True},
@@ -168,7 +226,9 @@ def write_workspace_file(output: Path, project_name: str, templates: list[str], 
     else:
         settings["terminal.integrated.defaultProfile.windows"] = "PowerShell"
 
-    recommendations = sorted({ext for name in templates for ext in EXTENSION_RECOMMENDATIONS.get(name, [])})
+    recommendations = sorted({
+        ext for s in selections for ext in EXTENSION_RECOMMENDATIONS.get(s.template, [])
+    })
 
     workspace = {
         "folders": folders,
@@ -176,7 +236,7 @@ def write_workspace_file(output: Path, project_name: str, templates: list[str], 
         "extensions": {"recommendations": recommendations},
     }
     # No absolute paths anywhere above -- every folder entry is workspaceFolder-
-    # relative ("features/<name>", not an absolute filesystem path). This is
+    # relative ("features/<alias>", not an absolute filesystem path). This is
     # the actual portability fix; `target` only ever changes settings values
     # that are genuinely OS-specific (terminal default profile), never a path.
 
@@ -192,19 +252,19 @@ def write_workspace_file(output: Path, project_name: str, templates: list[str], 
     return ws_path
 
 
-def write_manifest(output: Path, source_repo: Path, templates: dict[str, str], commits: dict[str, str], target: str) -> None:
+def write_manifest(output: Path, source_repo: Path, selections: list[Selection], commits: dict[str, str], target: str) -> None:
     manifest = {
         "source_repo": str(source_repo),
         "target": target,
         "templates": [
-            {"name": name, "branch": branch, "commit": commits[name]}
-            for name, branch in templates.items()
+            {"folder": s.alias, "template": s.template, "branch": s.branch, "commit": commits[s.alias]}
+            for s in selections
         ],
     }
     (output / ".workspace-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def write_readme(output: Path, project_name: str, templates: list[str]) -> None:
+def write_readme(output: Path, project_name: str, selections: list[Selection]) -> None:
     lines = [
         f"# {project_name}",
         "",
@@ -215,8 +275,11 @@ def write_readme(output: Path, project_name: str, templates: list[str]) -> None:
         "## Included templates",
         "",
     ]
-    for name in templates:
-        lines.append(f"- `features/{name}/`")
+    for s in selections:
+        if s.alias != s.template:
+            lines.append(f"- `features/{s.alias}/` (from `{s.template}`)")
+        else:
+            lines.append(f"- `features/{s.alias}/`")
     lines += [
         "",
         "## Getting started",
@@ -233,24 +296,29 @@ def write_readme(output: Path, project_name: str, templates: list[str]) -> None:
     (output / "README.md").write_text("\n".join(lines))
 
 
-def write_claude_md(output: Path, project_name: str, templates: dict[str, str], commits: dict[str, str], target: str) -> None:
+def write_claude_md(output: Path, project_name: str, selections: list[Selection], commits: dict[str, str], target: str) -> None:
     lines = [
         f"# CLAUDE.md — {project_name}",
         "",
         "Generated by `vscode-workspace-gen`. This is a standalone project combining templates from",
-        "`coding-project-templates`; each `features/<name>/` is its own git worktree (against the",
+        "`coding-project-templates`; each `features/<alias>/` is its own git worktree (against the",
         f"bundled `.git-store/`, not the original repo) still checked out on its original branch.",
         "",
         f"Target machine this was generated for: **{target}**.",
         "",
         "## What's included",
         "",
-        "| Template | Branch | Commit at generation |",
-        "|---|---|---|",
+        "| Folder | Template | Branch | Commit at generation |",
+        "|---|---|---|---|",
     ]
-    for name, branch in templates.items():
-        lines.append(f"| `features/{name}` | `{branch}` | `{commits[name]}` |")
+    for s in selections:
+        lines.append(f"| `features/{s.alias}` | `{s.template}` | `{s.branch}` | `{commits[s.alias]}` |")
     lines += [
+        "",
+        "A folder whose Template column differs from its own name was generated with an explicit",
+        "`NAME:ALIAS` selection -- typically because this project needed the same template more than",
+        "once (e.g. two independent agents for two unrelated components). The worktree's branch and",
+        "history are still entirely the original template's; only the folder name changed.",
         "",
         "Full record in `.workspace-manifest.json`.",
         "",
@@ -264,9 +332,9 @@ def write_claude_md(output: Path, project_name: str, templates: dict[str, str], 
         "",
         "## If you move this folder",
         "",
-        "Every `features/<name>` is a git worktree, and git worktree links are absolute paths on",
-        "both ends (this project's own `.git-store/worktrees/<name>/gitdir` and each",
-        "`features/<name>/.git` file). Moving or renaming this folder breaks all of them until you",
+        "Every `features/<alias>` is a git worktree, and git worktree links are absolute paths on",
+        "both ends (this project's own `.git-store/worktrees/<alias>/gitdir` and each",
+        "`features/<alias>/.git` file). Moving or renaming this folder breaks all of them until you",
         "run `scripts/repair-worktrees.sh`. This is standard git worktree behavior, not something",
         "specific to how this project was generated -- `coding-project-templates` itself would have",
         "the same issue if it were moved.",
@@ -274,7 +342,7 @@ def write_claude_md(output: Path, project_name: str, templates: dict[str, str], 
     (output / "CLAUDE.md").write_text("\n".join(lines) + "\n")
 
 
-def write_todo(output: Path, templates: list[str]) -> None:
+def write_todo(output: Path, selections: list[Selection]) -> None:
     lines = [
         f"# Post-generation todo",
         "",
@@ -286,18 +354,21 @@ def write_todo(output: Path, templates: list[str]) -> None:
         "- [ ] If you want to version-control the wrapper files (this README, scripts/, .vscode/) themselves,",
         "      run `git init` in this folder -- the generated `.gitignore` already excludes `.git-store/`",
         "      so a wrapper-level `git add .` won't try to commit the bundled bare clone",
-        "- [ ] Each `features/<name>/` may need its own `.vscode/settings.json` for a per-folder",
+        "- [ ] Each `features/<alias>/` may need its own `.vscode/settings.json` for a per-folder",
         "      `python.defaultInterpreterPath` once you've created a venv there -- don't set that",
         "      globally in the top-level `.code-workspace`, it's ambiguous across multiple languages",
         "- [ ] Set up a remote for this project's own history if you `git init` the wrapper",
         "- [ ] Run `scripts/health-check.sh` once dependencies are installed",
         "- [ ] If you move or rename this folder after generation, run `scripts/repair-worktrees.sh`",
         "      first thing -- git worktree links are absolute paths on both ends, so every",
-        "      `features/<name>` stops working (\"not a git repository\") until they're repaired",
+        "      `features/<alias>` stops working (\"not a git repository\") until they're repaired",
         "",
     ]
-    for name in templates:
-        lines.append(f"- [ ] Review `features/{name}/README.md` for template-specific setup steps")
+    for s in selections:
+        if s.alias != s.template:
+            lines.append(f"- [ ] Review `features/{s.alias}/README.md` (from `{s.template}`) for template-specific setup steps")
+        else:
+            lines.append(f"- [ ] Review `features/{s.alias}/README.md` for template-specific setup steps")
     (output / "todo.md").write_text("\n".join(lines) + "\n")
 
 
@@ -335,7 +406,7 @@ def copy_scripts(output: Path) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--spec", type=Path, help="claude/N-*.md spec file with a ```yaml block")
-    p.add_argument("--templates", help="comma-separated template names (ignored if --spec given)")
+    p.add_argument("--templates", help="comma-separated NAME or NAME:ALIAS entries (ignored if --spec given)")
     p.add_argument("--output", type=Path, help="output folder path (ignored if --spec given)")
     p.add_argument("--project-name", help="short project name, used in .code-workspace filename (ignored if --spec given)")
     p.add_argument("--target", choices=VALID_TARGETS, help="wsl2 or windows (ignored if --spec given)")
@@ -361,14 +432,19 @@ def main() -> None:
         target = args.target
 
     available = discover_templates(source_repo)
-    validate_selection(templates_list, target, available)
-    selected = {name: available[name] for name in templates_list}
+    selections = parse_template_selections(templates_list, available)
+    validate_target(target)
 
     print(f"Source repo:  {source_repo}")
     print(f"Output:       {output}")
     print(f"Project name: {project_name}")
     print(f"Target:       {target}")
-    print(f"Templates:    {', '.join(f'{n} ({b})' for n, b in selected.items())}")
+    print("Templates:")
+    for s in selections:
+        if s.alias != s.template:
+            print(f"  - features/{s.alias}  (from {s.template} @ {s.branch})")
+        else:
+            print(f"  - features/{s.alias}  ({s.branch})")
 
     if args.dry_run:
         print("\n--dry-run: nothing written.")
@@ -382,14 +458,14 @@ def main() -> None:
     git_store = clone_bare_store(source_repo, output)
 
     print("Adding worktrees...")
-    commits = add_worktrees(git_store, output, selected)
+    commits = add_worktrees(git_store, output, selections)
 
     print("Writing .vscode, docs, manifest...")
-    ws_path = write_workspace_file(output, project_name, list(selected), target)
-    write_manifest(output, source_repo, selected, commits, target)
-    write_readme(output, project_name, list(selected))
-    write_claude_md(output, project_name, selected, commits, target)
-    write_todo(output, list(selected))
+    ws_path = write_workspace_file(output, project_name, selections, target)
+    write_manifest(output, source_repo, selections, commits, target)
+    write_readme(output, project_name, selections)
+    write_claude_md(output, project_name, selections, commits, target)
+    write_todo(output, selections)
     write_gitignore(output)
     copy_scripts(output)
 

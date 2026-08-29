@@ -44,6 +44,21 @@ Once the resulting `claude/N-*.md` spec looks right:
 /generate-workspace claude/2-my-app-workspace.md
 ```
 
+### Repeating a template (NAME:ALIAS)
+
+Each templates entry, in `--templates` or in a spec's `templates:` list, may be `NAME` or
+`NAME:ALIAS`. Use `NAME:ALIAS` when one output needs the same template more than once, for
+example two independent `claude-code-basic` agents backing two unrelated components: the
+worktree still checks out `NAME`'s branch and history, it just lands in `features/<ALIAS>`
+instead of `features/<NAME>`, so it doesn't collide with the other selection of the same
+template. Every alias in one generation must be unique.
+
+```bash
+python3 scripts/generate-workspace.py \
+  --templates claude-code-advance:keyword-agent,python-scripts:keyword-scripts,claude-code-basic:notion-agent,python-app:notion-scripts \
+  --output ~/projects/youtube-pipeline --project-name youtube-pipeline --target wsl2
+```
+
 You can also run the generator directly, without a spec file or a live Claude Code session:
 
 ```bash
@@ -97,6 +112,6 @@ Useful prompts to get started:
 
 ---
 
-**Template Version**: 1.0 (Phase 6 complete — Cards 1, 2, 3 all executed and verified)
-**Last Updated**: 2026-08-25
+**Template Version**: 1.1 (Phase 6 complete, Card 4: NAME:ALIAS support added 2026-08-29)
+**Last Updated**: 2026-08-29
 **Branch**: `vscode-gen` | **Stack**: Claude Code (commands, subagents, hooks) + Python 3 (generator script, PyYAML for `--spec` parsing) — no runtime deps for the template itself

@@ -134,3 +134,33 @@ While re-syncing the pytest.ini fix into the already-generated sample project to
 - Full pipeline re-run end to end after all fixes: generate → `setup-env.sh` (via `uv`) → `health-check.sh` (clean pass, exit 0) → `sync-templates.sh` (correctly fast-forwards) → re-run `health-check.sh` again (still clean)
 - Everything above was exercised against real output on disk, not dry-run only
 - **Not done**: a literal live `/generate-workspace` slash-command interview through a separate real Claude Code session (this session isn't running inside `features/vscode-workspace-gen`, so `workspace-architect` isn't in its own available-agent list) — the underlying mechanics it depends on (subagent tool restrictions, the spec format, `generate-workspace.py`'s `--spec` path) were all verified directly instead. Worth a manual pass by a human opening a session there directly, if maximum confidence is wanted before calling Phase 6 fully closed.
+
+---
+
+## Addendum: NAME:ALIAS support for repeated templates
+
+Executed 2026-08-29, prompted by planning the first real downstream use of this generator (a `youtube-pipeline` workspace, see `claude/1-YouTube-Pipeline-Workspace-Plan.md`).
+
+### The problem
+
+That workspace needs three independent agent-plus-Python pairings (a keyword-intelligence Routine agent, a production-pipeline interactive agent, and a Notion API integration), but `coding-project-templates` only has two agent templates (`claude-code-advance`, `claude-code-basic`) and two Python templates (`python-app`, `python-scripts`). `write_workspace_file` names every worktree folder after the template itself (`features/<name>`), so selecting the same template a second time silently collided on one folder, there was no way to ask for "claude-code-basic, but a second, separately-named copy."
+
+### What changed
+
+- `scripts/generate-workspace.py`: every `--templates` entry (or spec `templates:` list item) may now be `NAME` or `NAME:ALIAS`. A new `Selection` NamedTuple (`alias`, `template`, `branch`) replaces the old `{name: branch}` dict everywhere; `parse_template_selections()` resolves tokens, defaults alias to the template name when omitted, and rejects unknown templates, malformed tokens, unsafe alias characters, and duplicate aliases with a clear error naming both conflicting entries. `add_worktrees`, `write_workspace_file`, `write_manifest`, `write_readme`, `write_claude_md`, and `write_todo` all now key off `alias` for the folder path and `template`/`branch` for everything about what's actually inside it (extension recommendations, branch, commit). The generated `CLAUDE.md`'s template table gained a `Template` column alongside `Folder` so an aliased worktree's real origin is still visible.
+- Also fixed in passing: `discover_templates`'s "no template rows found" error referenced an undefined `claude_md` instead of `claude_md_path` (a latent `NameError` that would have fired only on that one error path, found by inspection while making the change above, unrelated to it otherwise).
+- Documentation: `README.md` gained a "Repeating a template (NAME:ALIAS)" section with a worked example; `workspace-architect.md`'s completeness check and spec-writing instructions now mention alias syntax and reject a spec that reuses one template's name across two components without an alias.
+
+### Why not one of the other two options considered
+
+- Folding a repeated need into an already-selected worktree as a subpackage (e.g. Notion code living inside `features/python-app` alongside unrelated workbook-builder code) was rejected: it blurs the clean one-worktree-per-component separation the rest of this tool's output already keeps, and ties two unrelated codebases' commit history together.
+- A fully separate `generate-workspace.py` run and repo per repeated component was rejected: it works, but contradicts the actual ask (one project, worktrees aligned with how `coding-project-templates` itself is structured), and doubles the number of `.git-store` bare clones for what is otherwise one project.
+
+### Verification
+
+- `/usr/bin/python3 -m py_compile scripts/generate-workspace.py` clean (system Python, sidesteps the `.venv` PATH-shadowing noted in Card 2's addendum).
+- `--dry-run` against the actual six-selection case this was motivated by (`claude-code-advance`, `python-scripts`, `claude-code-basic`, `python-app`, each selected once more under an alias) printed six distinct `features/<alias>` lines with the correct source template and branch for each, no collision.
+- Three error-path checks: two entries resolving to the same alias (both a bare duplicate and an explicit collision) fails with a clear message naming both entries; an unknown template name still reports cleanly with the valid-choices list.
+- A real (non-dry-run) generation with three aliased selections (two of them reusing `claude-code-basic` and `python-app`'s already-tested-once template family) produced correct output end to end: `features/<alias>` worktrees each checked out the right branch (confirmed via `git rev-parse --abbrev-ref HEAD` per folder), `.workspace-manifest.json`, the generated `README.md`, and the generated `CLAUDE.md` all correctly distinguished folder name from source template, and `scripts/health-check.sh` ran against the aliased output without error (skipped, as expected, since no dependencies were installed).
+- Confirmed by reading them that `setup-env.sh`, `health-check.sh`, `sync-templates.sh`, `git-sync-all.sh`, and `repair-worktrees.sh` all already iterate `features/*/` and derive each worktree's branch live via `git rev-parse --abbrev-ref HEAD` rather than assuming folder name equals template name -- none of the four generated-project scripts needed any change for aliasing to work.
+- Not done: an actual live `/generate-workspace` interview producing an aliased spec through a real Claude Code session opened in this worktree (same gap Card 3 already flagged for the non-aliased case).

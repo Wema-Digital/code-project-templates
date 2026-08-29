@@ -14,7 +14,11 @@ A prompt describing what's wanted so far: some combination of which templates, a
 ## What counts as "complete" for a spec
 
 All four of these, unambiguous:
-- **templates** — one or more valid template names (see below)
+- **templates**: one or more valid template names (see below). An entry may be `NAME` or
+  `NAME:ALIAS`; use `NAME:ALIAS` when the request needs the same template more than once
+  (e.g. two independent `claude-code-basic` agents for two unrelated components) so each
+  gets its own `features/<ALIAS>` folder instead of colliding on `features/<NAME>`. Every
+  alias across the spec must be unique.
 - **output_path** — where the generated project should be written
 - **project_name** — short name, used in the `.code-workspace` filename
 - **target** — exactly `wsl2` or `windows`
@@ -25,7 +29,7 @@ All four of these, unambiguous:
 
 ## Step 2: check completeness
 
-If the request is missing or ambiguous on any of the four fields above, or names a template not in that table, stop here and report:
+If the request is missing or ambiguous on any of the four fields above, names a template not in that table, or reuses one template's name for two different components without giving at least one of them an alias, stop here and report:
 
 ```
 NEEDS-INPUT:
@@ -50,7 +54,7 @@ Status: draft
 
 ​```yaml
 templates:
-  - <name>
+  - <name>              # or <name>:<alias> if this template is needed more than once
   - <name>
 output_path: <path>
 project_name: <name>
@@ -58,7 +62,7 @@ target: wsl2  # or windows
 ​```
 
 ## Notes
-<anything worth recording: alternatives considered, assumptions made, open questions the user already resolved verbally>
+<anything worth recording: alternatives considered, assumptions made, open questions the user already resolved verbally, any :alias used and why>
 ```
 
 The fenced ` ```yaml ` block is load-bearing -- `scripts/generate-workspace.py` parses exactly this format (see its `parse_spec` function if you need to check the exact expected shape). Get the block right: valid YAML, all four keys present, `templates` as a list even for a single template.

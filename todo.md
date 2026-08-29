@@ -56,6 +56,22 @@
 
 ---
 
+## Card 4 — NAME:ALIAS support for repeated templates (done)
+
+```markdown
+- [x] [!] scripts/generate-workspace.py: NAME:ALIAS selection syntax, Selection NamedTuple,
+      updated add_worktrees/write_workspace_file/write_manifest/write_readme/write_claude_md/write_todo
+- [x] Fixed a latent NameError in discover_templates's empty-table error message (claude_md -> claude_md_path)
+- [x] README.md: "Repeating a template (NAME:ALIAS)" section with a worked example
+- [x] workspace-architect.md: completeness check and spec template updated for alias syntax
+- [x] Verified: py_compile, dry-run collision/error cases, a real 3-alias end-to-end generation,
+      confirmed the four generated-project scripts are already alias-agnostic (see plan.md addendum)
+- [>] Not done: a live /generate-workspace interview producing an aliased spec through a real
+      Claude Code session (same gap as Card 3's non-aliased version)
+```
+
+---
+
 ## Known gaps / discussion
 
 ```markdown
@@ -68,6 +84,6 @@
 
 ## Metadata
 
-*Last Updated: 2026-08-25*
+*Last Updated: 2026-08-29*
 *Template Version: 0.2*
 *Stack: Claude Code (commands, subagents, hooks) + Python 3 generator script*
