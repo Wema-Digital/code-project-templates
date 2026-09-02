@@ -8,7 +8,7 @@
 
 `coding-project-templates` holds a dozen independent templates (`web-flask`, `python-scripts`, `js-express`, ...), each its own git worktree branch. Most projects only need two or three of them combined into one place — this tool builds that combination as a real, standalone folder:
 
-- `<project-name>.code-workspace` — a multi-root workspace file at the folder root (not `.vscode/`), written for the target machine (native Windows or WSL2), `${workspaceFolder}`-relative paths only, with a full `settings`/`launch`/`tasks` block
+- `<project-name>.code-workspace` — a multi-root workspace file at the folder root (not `.vscode/`), written for the target machine (native Windows or WSL2), every path anchored to the named `${workspaceFolder:<project-name>}` variable (no absolutes, no bare `${workspaceFolder}`), with a full `settings`/`launch`/`tasks` block
 - `features/<alias>/` — one git worktree per selected template, each still a full git branch with history
 - `scripts/` — small setup/sync/health-check/repair helpers for the generated project (see "If you move the generated project" below)
 - `docs/workflows_diagrams/` — a copy of the source workflow diagram, when the build was driven by one (`--workflow`)

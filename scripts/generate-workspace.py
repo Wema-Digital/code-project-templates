@@ -259,18 +259,26 @@ def write_workspace_file(
     # at .vscode/features/<alias> and load broken. Root placement is also the
     # VS Code convention (a .vscode/ folder is for settings.json / launch.json,
     # not the workspace file).
-    folders = [{"path": "."}]
+    #
+    # Settings/launch/tasks reference the root via the NAMED multi-root variable
+    # ${workspaceFolder:<project_name>}, not the bare ${workspaceFolder}. In a
+    # multi-root workspace the bare form resolves to whichever folder happens to
+    # be first and is unreliable across extensions; the named form is anchored to
+    # the "." folder's explicit `name` below, so it always points at the output
+    # root regardless of folder order or the output directory's basename.
+    root = f"${{workspaceFolder:{project_name}}}"
+    folders = [{"path": ".", "name": project_name}]
     folders += [{"path": f"features/{s.alias}"} for s in selections]
     if has_docs:
         folders.append({"path": "docs"})
 
     py = [s for s in selections if _is_python(s.template)]
     if target == "wsl2":
-        venv_python = "${workspaceFolder}/.venv/bin/python"
-        venv_bin = "${workspaceFolder}/.venv/bin"
+        venv_python = f"{root}/.venv/bin/python"
+        venv_bin = f"{root}/.venv/bin"
     else:
-        venv_python = "${workspaceFolder}/.venv/Scripts/python.exe"
-        venv_bin = "${workspaceFolder}/.venv/Scripts"
+        venv_python = f"{root}/.venv/Scripts/python.exe"
+        venv_bin = f"{root}/.venv/Scripts"
 
     settings: dict = {
         "files.exclude": {"**/.git-store": True},
@@ -290,13 +298,13 @@ def write_workspace_file(
         # that needs its own interpreter overrides this in its own
         # features/<alias>/.vscode/settings.json, not here.
         settings["python.defaultInterpreterPath"] = venv_python
-        settings["python.envFile"] = "${workspaceFolder}/.env"
+        settings["python.envFile"] = f"{root}/.env"
         settings["python.analysis.extraPaths"] = [
-            f"${{workspaceFolder}}/features/{s.alias}" for s in py
+            f"{root}/features/{s.alias}" for s in py
         ]
         settings["python.testing.pytestEnabled"] = True
         settings["python.testing.unittestEnabled"] = False
-        settings["python.testing.pytestArgs"] = [f"features/{s.alias}" for s in py]
+        settings["python.testing.pytestArgs"] = [f"{root}/features/{s.alias}" for s in py]
 
     recommendations = {
         ext for s in selections for ext in EXTENSION_RECOMMENDATIONS.get(s.template, [])
@@ -319,7 +327,7 @@ def write_workspace_file(
                 "type": "debugpy",
                 "request": "launch",
                 "module": "pytest",
-                "args": [f"${{workspaceFolder}}/features/{s.alias}"],
+                "args": [f"{root}/features/{s.alias}"],
                 "console": "integratedTerminal",
             })
 
@@ -330,7 +338,7 @@ def write_workspace_file(
             "label": label,
             "type": "shell",
             "command": f"bash scripts/{script}",
-            "options": {"cwd": "${workspaceFolder}"},
+            "options": {"cwd": root},
             "problemMatcher": [],
         }
 
@@ -350,9 +358,10 @@ def write_workspace_file(
         "launch": launch,
         "tasks": tasks,
     }
-    # Every path above is ${workspaceFolder}-relative or a bare relative path --
-    # never an absolute filesystem path. `target` only switches genuinely
-    # OS-specific values (venv layout, terminal profile, PATH separator).
+    # Every path above is anchored to ${workspaceFolder:<project_name>} or is a
+    # bare relative path -- never an absolute filesystem path. `target` only
+    # switches genuinely OS-specific values (venv layout, terminal profile,
+    # PATH separator).
 
     ws_path = output / f"{project_name}.code-workspace"
     content = json.dumps(workspace, indent=4)
@@ -519,7 +528,7 @@ def write_claude_md(
     (output / "CLAUDE.md").write_text("\n".join(lines) + "\n")
 
 
-def write_todo(output: Path, selections: list[Selection], wrapper_inited: bool = False) -> None:
+def write_todo(output: Path, project_name: str, selections: list[Selection], wrapper_inited: bool = False) -> None:
     wrapper_line = (
         "- [ ] Wrapper git repo is initialised on `main`; push it with "
         "`scripts/push-wrapper.sh <remote-url>` when you have one"
@@ -538,7 +547,8 @@ def write_todo(output: Path, selections: list[Selection], wrapper_inited: bool =
         "- [ ] Fill in real values for each included template's `.env.example` (if it has one)",
         wrapper_line,
         "- [ ] The `.code-workspace` points `python.defaultInterpreterPath` at the one shared",
-        "      `${workspaceFolder}/.venv`. If a `features/<alias>/` needs its own interpreter, add",
+        f"      `${{workspaceFolder:{project_name}}}/.venv` (named multi-root variable, anchored to the",
+        "      `.` folder). If a `features/<alias>/` needs its own interpreter, add",
         "      `features/<alias>/.vscode/settings.json` with a per-folder path -- don't change the global one",
         "- [ ] Run `scripts/health-check.sh` once dependencies are installed",
         "- [ ] If you move or rename this folder after generation, run `scripts/repair-worktrees.sh`",
@@ -685,6 +695,15 @@ def main() -> None:
     selections = parse_template_selections(templates_list, available)
     validate_target(target)
 
+    # The workspace file names the root folder after project_name and points
+    # ${workspaceFolder:<project_name>} at it; a component folder with the same
+    # name would make that variable ambiguous.
+    if project_name in {s.alias for s in selections}:
+        raise SystemExit(
+            f"error: project name {project_name!r} collides with component folder "
+            f"features/{project_name} -- choose a different project name"
+        )
+
     print(f"Source repo:  {source_repo}")
     print(f"Output:       {output}")
     print(f"Project name: {project_name}")
@@ -723,7 +742,7 @@ def main() -> None:
     write_readme(output, project_name, selections)
     write_claude_md(output, project_name, selections, commits, branches, target,
                     workflow_docs, args.init_wrapper)
-    write_todo(output, selections, args.init_wrapper)
+    write_todo(output, project_name, selections, args.init_wrapper)
     write_gitignore(output)
     copy_scripts(output)
 

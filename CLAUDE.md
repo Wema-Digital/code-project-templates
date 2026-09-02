@@ -21,11 +21,13 @@ Every run, before writing the `.code-workspace` settings, check the current VS C
 
 ## Standing rule: ask Windows vs WSL2, but don't rely on it for portability
 
-The generated project's `.code-workspace` needs to work regardless of whether it's opened on native Windows or through WSL2. Ask which one the user's targeting, because a handful of settings genuinely are OS-specific — but the actual portability fix is writing paths as `${workspaceFolder}`-relative wherever the settings schema allows it, not hardcoded absolutes. This repo's own committed workspace file hardcoded a WSL path (`/mnt/w/vscode.workspaces/...`) into several settings and broke the moment someone opened it natively — don't repeat that.
+The generated project's `.code-workspace` needs to work regardless of whether it's opened on native Windows or through WSL2. Ask which one the user's targeting, because a handful of settings genuinely are OS-specific — but the actual portability fix is anchoring paths to `${workspaceFolder:<project-name>}` (the **named** multi-root variable — see the standing rule below) wherever the settings schema allows it, not hardcoded absolutes. This repo's own committed workspace file hardcoded a WSL path (`/mnt/w/vscode.workspaces/...`) into several settings and broke the moment someone opened it natively — don't repeat that.
 
 ## Standing rule: the generated `.code-workspace` ships complete, at the root
 
-`generate-workspace.py::write_workspace_file()` writes `<output>/<name>.code-workspace`, **not** `<output>/.vscode/` — folder paths in a workspace file resolve relative to the file's own directory, so under `.vscode/` every `features/<alias>` entry points at `.vscode/features/<alias>` and loads broken. The file is not a stub: `folders` (`.` first, then each component, then `docs/` when present), a full `settings` block (`python.defaultInterpreterPath` → the shared `.venv`, `python.envFile`, `python.analysis.extraPaths` + pytest per Python component, terminal PATH prepend), `launch` (debugpy per component), and `tasks` (the setup/health/sync scripts). Model new keys on the *structure* of the root `coding-project-templates.code-workspace`, never its hardcoded absolute paths.
+`generate-workspace.py::write_workspace_file()` writes `<output>/<name>.code-workspace`, **not** `<output>/.vscode/` — folder paths in a workspace file resolve relative to the file's own directory, so under `.vscode/` every `features/<alias>` entry points at `.vscode/features/<alias>` and loads broken. The file is not a stub: `folders` (`.` first, given an explicit `"name": <project-name>`, then each component, then `docs/` when present), a full `settings` block (`python.defaultInterpreterPath` → the shared `.venv`, `python.envFile`, `python.analysis.extraPaths` + pytest per Python component, terminal PATH prepend), `launch` (debugpy per component), and `tasks` (the setup/health/sync scripts). Model new keys on the *structure* of the root `coding-project-templates.code-workspace`, never its hardcoded absolute paths.
+
+**Anchor every path to `${workspaceFolder:<project-name>}` — the named form, never bare `${workspaceFolder}`.** In a multi-root workspace the bare variable resolves to whichever folder is listed first, and several extensions (the Project Manager one, historically parts of the Python extension) don't expand it at all. The named form, paired with the explicit `"name"` on the `.` folder, resolves to the output root deterministically. Bare `${workspaceFolder}` was tried for this repo's own file (`claude/8-*.md`, "Course correction") and pointed at `.vscode/` instead of the repo root. A `--project-name` equal to a component folder name is rejected, since it would make the variable ambiguous.
 
 ## Standing rule: one shared `.venv`, via uv
 
@@ -51,8 +53,8 @@ The fix: generate a fresh **bare clone of this repo inside the output folder** (
 <output>/
 ├── .git-store/                    # bare clone of coding-project-templates — not the live checkout
 ├── <project-name>.code-workspace  # at the ROOT, not .vscode/: folder paths resolve relative to
-│                                  #   this file. OS-appropriate, ${workspaceFolder}-relative,
-│                                  #   full settings/launch/tasks (not a stub)
+│                                  #   this file. OS-appropriate, paths anchored to
+│                                  #   ${workspaceFolder:<project-name>}, full settings/launch/tasks
 ├── features/
 │   └── <alias>/                   # git worktree per selected template, against .git-store
 ├── scripts/                       # small, single-purpose — see below, not one monolith

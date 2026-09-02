@@ -196,16 +196,21 @@ The generated output is not workable as-is — it needs hand-finishing, and the 
 - **Spec-referenced docs lived only in chat.** `YouTube_Pipeline_Ownership_and_Workspace_Map.md` is cited throughout the plan and exists nowhere on disk.
 - **The wrapper folder had no git history.** The glue (`.code-workspace`, `scripts/`, `CLAUDE.md`, `docs/`, manifest) was untracked and unpushed — only the 6 template branches were recoverable.
 
-### What will change (not yet done — this addendum is the scope record)
+### What changed (done 2026-09-02, branch `vscode-gen`)
 
-- `scripts/generate-workspace.py::write_workspace_file()` — emit a full settings/launch/tasks block, modelled on the *structure* of the root `coding-project-templates.code-workspace` but `${workspaceFolder}`-relative throughout (never its hardcoded `/mnt/w/...` absolutes). Fix the folder-roots convention to wrapper `.` + one entry per feature + `docs/`. New optional `--workflow <path>` (copy source diagram(s) into generated `docs/workflows_diagrams/`, link from generated `CLAUDE.md`) and `--init-wrapper` (`git init` the output root, seed a `main` branch, write `push-wrapper.sh`).
-- `scripts/setup-env.sh` — default to one shared `uv` `.venv` at the output root (fallback `python3 -m venv` + `pip`), each Python `features/<alias>` installed editable; `--isolated` flag restores the current per-worktree behaviour. Ship the general-purpose `scripts/uv-venv-setup.md` (extracted from the root repo's `scripts/sequence.md`) into generated output.
-- `.claude/agents/workspace-architect.md` — a workflow diagram is an explicit, expected spec input for "workspace from a workflow" requests; the written spec must carry a node→component→status table; any doc the spec references must be committed into this worktree's `claude/` or `docs/`.
-- `CLAUDE.md` — the above as standing rules (shared uv `.venv` default; full non-stub `.code-workspace`; workflow diagram copied + mapped when one drove the build; wrapper gets its own `git init` + `main` branch).
+- `scripts/generate-workspace.py::write_workspace_file()` — now emits a full settings/launch/tasks block modelled on the *structure* of the root `coding-project-templates.code-workspace` but with no absolute paths. The `.code-workspace` is written at the **output root**, not `<output>/.vscode/` (folder paths resolve relative to the file's directory, so `.vscode/` placement broke every `features/<alias>` root). `folders` is `.` (given an explicit `"name": <project_name>`) + one per component + `docs/` when present. Every settings/launch/task path is anchored to the **named** variable `${workspaceFolder:<project_name>}` — see the course correction below. Added `--workflow <path>` (repeatable; also reads a spec `workflow:` list, resolved relative to the spec file) and `--init-wrapper` (`git init` the output root on a `main` branch via `symbolic-ref`, write `scripts/push-wrapper.sh`, stage the glue; `.gitignore` also excludes `features/`).
+- `scripts/setup-env.sh` — default is now one shared `.venv` at the project root, uv-first (`uv venv` + `uv pip install --python`), each Python `features/<alias>` installed into it (editable where it has a `pyproject.toml`); `--isolated` restores per-worktree venvs. venv bin dir auto-detected (`bin/` vs `Scripts/`). (The general-purpose `scripts/uv-venv-setup.md` is still to come from card (d).)
+- `.claude/agents/workspace-architect.md` — a workflow diagram is now an explicit spec input: optional `workflow:` key (worktree-relative paths, must already exist), a required "Workflow coverage" node→component→status table when it's set, and a `NEEDS-INPUT` for a workflow-driven request with no committed diagram.
+- `CLAUDE.md` / `README.md` / `.claude/commands/generate-workspace.md` — the above as standing rules; all `.vscode/*.code-workspace` output references corrected to the root file; version bumped to 1.2.
 
-### Verification (to record when the work lands)
+### Course correction: named `${workspaceFolder:…}`, not bare, not hardcoded
 
-- Dry-run generation produces a `.code-workspace` that opens clean on both WSL2 and native Windows with no hand-editing.
-- `setup-env.sh` produces one working shared `.venv`.
-- `workspace-architect`'s spec template includes the node→component table.
-- This addendum updated with the actual diffs and the root `claude/8` note cross-checked.
+The first cut used bare `${workspaceFolder}` (and de-hardcoded the repo's own `coding-project-templates.code-workspace` to match, commit `a9b94ca` on `main`). That broke: the repo file is opened from `.vscode/`, and with `{"path": "."}` first, bare `${workspaceFolder}` resolved to `…/coding-project-templates/.vscode`, so `${workspaceFolder}/.venv/...` was a dead path. The `main` change was reverted (`be6de17`) — the repo's own file keeps its absolute paths. The generator did **not** fall back to hardcoded absolutes (a generated project should stay portable); it uses `${workspaceFolder:<project_name>}` with the `.` folder explicitly named, which resolves to the output root regardless of folder order or the output directory basename. A `--project-name` equal to a component folder name is now a hard error.
+
+### Verification (done)
+
+- `py_compile`; `--dry-run`; real generations via CLI and `--spec`, aliased and not, `wsl2` and `windows`, python-only and claude-only.
+- Generated `.code-workspace` is valid JSON, passes `validate-workspace-json.sh`, and every path reads `${workspaceFolder:<project_name>}/…` — no absolutes, no bare form.
+- `setup-env.sh` (shared + `--isolated`) builds working venvs on a freshly generated project (uv present); idempotent re-run; `health-check.sh` exit 0.
+- `--workflow` copies into `docs/workflows_diagrams/` and adds the `docs` root; `--init-wrapper` leaves a `main`-branch repo with `features/` correctly ignored.
+- Not done: a literal `/generate-workspace` interview through a real session opened in this worktree (the long-standing manual-pass gap); `scripts/uv-venv-setup.md` (card (d)).
