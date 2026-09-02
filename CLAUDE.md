@@ -66,6 +66,13 @@ Phases in order: Housekeeping → Root CLAUDE.md → Base Template → Propagate
 | `scripts/setup-github-project.sh` | Creates the GitHub Project, Phase field, and seeds all tasks |
 | `ProjectSetup-linux-os.py` | Generates `.code-workspace`, `project.env`, `project.csv` from the repo layout |
 
+## Reference docs
+
+| Doc | Purpose |
+|---|---|
+| `scripts/uv-venv-setup.md` | Project-agnostic guide to creating and working with a `uv`-managed virtualenv (project vs env-only workflow, lockfiles, VS Code wiring) |
+| `scripts/sequence.md` | The wema-project baseline's end-to-end setup sequence (Phases 0–5) — project-specific, not general |
+
 ## Where things live
 
 | Path | Contents |
