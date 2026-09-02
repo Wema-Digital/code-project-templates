@@ -27,27 +27,27 @@
             "PATH": "${env:anaconda_environment};"
         },
         "terminal.integrated.env.linux": {
-            "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+            "PATH": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/.venv/bin:${env:PATH}"
         },
-        "terminal.integrated.cwd": "${workspaceFolder}",
+        "terminal.integrated.cwd": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates",
         "workbench.editor.languageDetection": true,
         "files.autoSave": "afterDelay",
         "diffEditor.renderSideBySide": true,
         "breadcrumbs.enabled": true,
         "editor.minimap.enabled": true,
-        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-        "python.envFile": "${workspaceFolder}/project.env",
+        "python.defaultInterpreterPath": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/.venv/bin/python",
+        "python.envFile": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/project.env",
         "python.experiments.enabled": true,
         "python.experiments.optInto": [],
         "python.experiments.optOutFrom": [],
         "python.globalModuleInstallation": false,
         "python.analysis.aiCodeActions": {},
         "python.analysis.extraPaths": [
-            "${workspaceFolder}/core",
-            "${workspaceFolder}/features",
-            "${workspaceFolder}/core/tests"
+            "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/core",
+            "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/features",
+            "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/core/tests"
         ],
-        "python.testing.pytestPath": "${workspaceFolder}/.venv/bin/pytest",
+        "python.testing.pytestPath": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates/.venv/bin/pytest",
         "python.testing.pytestEnabled": true,
         "python.testing.unittestEnabled": false,
         "python.testing.pytestArgs": [
@@ -60,17 +60,17 @@
         "projectManager": {
             "any": {
                 "baseFolders": [
-                    "${workspaceFolder}"
+                    "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates"
                 ]
             },
             "git": {
                 "baseFolders": [
-                    "${workspaceFolder}"
+                    "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates"
                 ]
             },
             "vscode": {
                 "baseFolders": [
-                    "${workspaceFolder}"
+                    "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates"
                 ]
             },
             "tags": [
@@ -95,7 +95,7 @@
                 "request": "launch",
                 "module": "coding-project-templates",
                 "env": {
-                    "PYTHONPATH": "${workspaceFolder}"
+                    "PYTHONPATH": "/mnt/w/vscode.workspaces/wema.digital.github/coding-project-templates"
                 },
                 "console": "integratedTerminal"
             }
