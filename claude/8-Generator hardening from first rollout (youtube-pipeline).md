@@ -69,17 +69,36 @@ a `youtube-pipeline`-specific fix.
 Branch `vscode-gen` unless noted:
 
 - `scripts/generate-workspace.py::write_workspace_file()` — full settings/launch/tasks block,
-  modelled on the *structure* of the root `coding-project-templates.code-workspace` but
-  `${workspaceFolder}`-relative throughout; fixed folder-roots convention; new
-  `--workflow <path>` (copy source diagram into generated `docs/`) and `--init-wrapper`
-  (`git init` + `main` branch + `push-wrapper.sh`) options.
+  modelled on the *structure* of the root `coding-project-templates.code-workspace` but with
+  no absolute paths: every reference is the **named** multi-root variable
+  `${workspaceFolder:<project_name>}`, anchored to an explicitly-named `.` folder. The bare
+  `${workspaceFolder}` is not used — in a multi-root workspace it resolves to whichever folder
+  is first and several extensions don't expand it reliably (this bit the repo's own file, see
+  "Course correction" below). Also: fixed folder-roots convention; new `--workflow <path>`
+  (copy source diagram into generated `docs/`) and `--init-wrapper` (`git init` + `main`
+  branch + `push-wrapper.sh`) options.
 - `scripts/setup-env.sh` — default to one shared `uv` `.venv`; `--isolated` for the old
   per-worktree behaviour.
 - `.claude/agents/workspace-architect.md` — workflow diagram is an explicit spec input; the
   spec must carry a node→component→status table; referenced docs must be committed.
 - `features/vscode-workspace-gen/CLAUDE.md` — the above as standing rules.
 - `features/vscode-workspace-gen/.claude/plan.md` — "Lessons from first real rollout" addendum.
-- `coding-project-templates.code-workspace` (branch `main`) — de-hardcode the `/mnt/w/...`
-  absolutes; it is currently pointed at as the "good structure" example while embodying the
-  documented anti-pattern.
+- `coding-project-templates.code-workspace` (branch `main`) — **left with its absolute paths**
+  after the de-hardcode was tried and reverted (see "Course correction"). Its `.vscode/` copy
+  is a stale duplicate; consolidating to the single root file is still open.
+
+## Course correction (2026-09-02): named `${workspaceFolder:…}`, not bare, and not hardcoded
+
+The first attempt de-hardcoded `coding-project-templates.code-workspace` to bare
+`${workspaceFolder}` (commit `a9b94ca`). It broke in practice: that file is opened from
+`.vscode/`, and with `{"path": "."}` as the first folder, bare `${workspaceFolder}` resolved
+to `.../coding-project-templates/.vscode`, so `${workspaceFolder}/.venv/...` pointed at a
+non-existent path. Reverted (`be6de17`); the repo's own file keeps its machine-absolute paths.
+
+The generator does **not** follow that back to hardcoded absolutes (option A) — a generated
+project is meant to be portable and a hardcoded interpreter path is exactly the anti-pattern
+this tool documents. It takes **option B**: the named multi-root variable
+`${workspaceFolder:<project_name>}`, with the `.` folder given an explicit `"name"` so the
+variable resolves deterministically regardless of folder order or the output directory's
+basename. A `project_name` that collides with a component folder name is now a hard error.
 - `scripts/uv-venv-setup.md` (branch `main`) — the general-purpose uv guide.
