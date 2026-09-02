@@ -11,9 +11,19 @@ Requires PyYAML (`pip install pyyaml`) only when reading a --spec file; the
 --templates/--output CLI path has no extra dependency.
 
 Usage:
-    generate-workspace.py --spec claude/2-my-app.md [--dry-run]
+    generate-workspace.py --spec claude/2-my-app.md [--dry-run] [--init-wrapper]
     generate-workspace.py --templates web-flask,python-scripts \\
-        --output ~/projects/my-app --project-name my-app --target wsl2 [--dry-run]
+        --output ~/projects/my-app --project-name my-app --target wsl2 \\
+        [--workflow docs/flow.mermaid] [--init-wrapper] [--dry-run]
+
+--workflow copies a diagram the workspace is derived from into
+<output>/docs/workflows_diagrams/ and links it from the generated CLAUDE.md; a
+--spec supplies the same thing via a `workflow:` list (paths relative to the
+spec file). --init-wrapper runs `git init` on the output folder on a `main`
+branch and adds scripts/push-wrapper.sh, so the wrapper's own glue files
+(scripts/, *.code-workspace, docs/, CLAUDE.md, ...) get a history of their own;
+the features/<alias> worktrees are gitignored there, each keeping its history
+in .git-store/.
 
 Each --templates entry (or each item in a --spec's `templates:` list) may be
 either `NAME` or `NAME:ALIAS`. Use `NAME:ALIAS` when you want the same
@@ -232,34 +242,119 @@ def add_worktrees(
     return commits, branches
 
 
-def write_workspace_file(output: Path, project_name: str, selections: list[Selection], target: str) -> Path:
-    folders = [{"path": f"features/{s.alias}"} for s in selections]
-    settings = {
+def _is_python(template: str) -> bool:
+    """Treat a template as Python-backed when it recommends the Python
+    extension -- keeps one source of truth (EXTENSION_RECOMMENDATIONS) rather
+    than a second hardcoded list that could drift from it."""
+    return "ms-python.python" in EXTENSION_RECOMMENDATIONS.get(template, [])
+
+
+def write_workspace_file(
+    output: Path, project_name: str, selections: list[Selection],
+    target: str, has_docs: bool = False,
+) -> Path:
+    # The .code-workspace goes at the OUTPUT ROOT, not <output>/.vscode/ --
+    # folder paths in a workspace file resolve relative to the file's own
+    # directory, so a file under .vscode/ makes every "features/<alias>" point
+    # at .vscode/features/<alias> and load broken. Root placement is also the
+    # VS Code convention (a .vscode/ folder is for settings.json / launch.json,
+    # not the workspace file).
+    folders = [{"path": "."}]
+    folders += [{"path": f"features/{s.alias}"} for s in selections]
+    if has_docs:
+        folders.append({"path": "docs"})
+
+    py = [s for s in selections if _is_python(s.template)]
+    if target == "wsl2":
+        venv_python = "${workspaceFolder}/.venv/bin/python"
+        venv_bin = "${workspaceFolder}/.venv/bin"
+    else:
+        venv_python = "${workspaceFolder}/.venv/Scripts/python.exe"
+        venv_bin = "${workspaceFolder}/.venv/Scripts"
+
+    settings: dict = {
         "files.exclude": {"**/.git-store": True},
-        "search.exclude": {"**/.git-store": True},
-        "files.watcherExclude": {"**/.git-store/**": True},
+        "search.exclude": {"**/.git-store": True, "**/.venv": True},
+        "files.watcherExclude": {"**/.git-store/**": True, "**/.venv/**": True},
+        "files.autoSave": "afterDelay",
     }
     if target == "wsl2":
         settings["terminal.integrated.defaultProfile.linux"] = "bash"
+        settings["terminal.integrated.env.linux"] = {"PATH": f"{venv_bin}:${{env:PATH}}"}
     else:
         settings["terminal.integrated.defaultProfile.windows"] = "PowerShell"
+        settings["terminal.integrated.env.windows"] = {"PATH": f"{venv_bin};${{env:PATH}}"}
 
-    recommendations = sorted({
+    if py:
+        # One shared root .venv (see scripts/setup-env.sh). A features/<alias>
+        # that needs its own interpreter overrides this in its own
+        # features/<alias>/.vscode/settings.json, not here.
+        settings["python.defaultInterpreterPath"] = venv_python
+        settings["python.envFile"] = "${workspaceFolder}/.env"
+        settings["python.analysis.extraPaths"] = [
+            f"${{workspaceFolder}}/features/{s.alias}" for s in py
+        ]
+        settings["python.testing.pytestEnabled"] = True
+        settings["python.testing.unittestEnabled"] = False
+        settings["python.testing.pytestArgs"] = [f"features/{s.alias}" for s in py]
+
+    recommendations = {
         ext for s in selections for ext in EXTENSION_RECOMMENDATIONS.get(s.template, [])
-    })
+    }
+    if py:
+        recommendations |= {"ms-python.debugpy", "charliermarsh.ruff"}
+
+    launch: dict = {"version": "0.2.0", "configurations": []}
+    if py:
+        launch["configurations"].append({
+            "name": "Python: current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+        })
+        for s in py:
+            launch["configurations"].append({
+                "name": f"Pytest: {s.alias}",
+                "type": "debugpy",
+                "request": "launch",
+                "module": "pytest",
+                "args": [f"${{workspaceFolder}}/features/{s.alias}"],
+                "console": "integratedTerminal",
+            })
+
+    def _task(label: str, script: str) -> dict:
+        # `bash scripts/<x>` (not a bare ./ path) so the same task definition
+        # runs under a wsl2 shell and under Git Bash on native Windows.
+        return {
+            "label": label,
+            "type": "shell",
+            "command": f"bash scripts/{script}",
+            "options": {"cwd": "${workspaceFolder}"},
+            "problemMatcher": [],
+        }
+
+    tasks = {
+        "version": "2.0.0",
+        "tasks": [
+            _task("setup-env", "setup-env.sh"),
+            _task("health-check", "health-check.sh"),
+            _task("git-sync-all", "git-sync-all.sh"),
+        ],
+    }
 
     workspace = {
         "folders": folders,
         "settings": settings,
-        "extensions": {"recommendations": recommendations},
+        "extensions": {"recommendations": sorted(recommendations)},
+        "launch": launch,
+        "tasks": tasks,
     }
-    # No absolute paths anywhere above -- every folder entry is workspaceFolder-
-    # relative ("features/<alias>", not an absolute filesystem path). This is
-    # the actual portability fix; `target` only ever changes settings values
-    # that are genuinely OS-specific (terminal default profile), never a path.
+    # Every path above is ${workspaceFolder}-relative or a bare relative path --
+    # never an absolute filesystem path. `target` only switches genuinely
+    # OS-specific values (venv layout, terminal profile, PATH separator).
 
-    ws_path = output / ".vscode" / f"{project_name}.code-workspace"
-    ws_path.parent.mkdir(parents=True, exist_ok=True)
+    ws_path = output / f"{project_name}.code-workspace"
     content = json.dumps(workspace, indent=4)
     ws_path.write_text(content + "\n")
 
@@ -268,6 +363,19 @@ def write_workspace_file(output: Path, project_name: str, selections: list[Selec
     # the exact failure mode that motivated the JSON-validation hook.
     json.loads(ws_path.read_text())
     return ws_path
+
+
+def copy_workflow_docs(output: Path, files: list[Path]) -> list[str]:
+    """Copy each workflow diagram into <output>/docs/workflows_diagrams/.
+    Returns the copied paths relative to <output>, for linking in CLAUDE.md."""
+    dest_dir = output / "docs" / "workflows_diagrams"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    rel: list[str] = []
+    for f in files:
+        dest = dest_dir / f.name
+        shutil.copy2(f, dest)
+        rel.append(str(dest.relative_to(output)))
+    return rel
 
 
 def write_manifest(
@@ -299,6 +407,9 @@ def write_readme(output: Path, project_name: str, selections: list[Selection]) -
         "Standalone: this folder carries its own complete git history in `.git-store/` and has no",
         "dependency on the source repo's location after generation.",
         "",
+        f"Open `{project_name}.code-workspace` (at this folder's root) in VS Code to load every",
+        "component as one multi-root workspace.",
+        "",
         "## Included templates",
         "",
     ]
@@ -312,7 +423,7 @@ def write_readme(output: Path, project_name: str, selections: list[Selection]) -
         "## Getting started",
         "",
         "```bash",
-        "scripts/setup-env.sh    # bootstraps whichever languages got included",
+        "scripts/setup-env.sh    # creates one shared .venv and installs whichever languages got included",
         "scripts/health-check.sh # smoke-tests each included template's test suite",
         "```",
         "",
@@ -326,6 +437,7 @@ def write_readme(output: Path, project_name: str, selections: list[Selection]) -
 def write_claude_md(
     output: Path, project_name: str, selections: list[Selection],
     commits: dict[str, str], branches: dict[str, str], target: str,
+    workflow_docs: list[str] | None = None, wrapper_inited: bool = False,
 ) -> None:
     forked = any(branches[s.alias] != s.branch for s in selections)
     lines = [
@@ -363,14 +475,37 @@ def write_claude_md(
     lines += [
         "",
         "Full record in `.workspace-manifest.json`.",
+    ]
+    if workflow_docs:
+        lines += [
+            "",
+            "## Workflow",
+            "",
+            "This workspace was generated from a workflow diagram. The source copy lives here:",
+            "",
+        ]
+        lines += [f"- `{p}`" for p in workflow_docs]
+        lines += [
+            "",
+            "Each component above maps to one or more nodes in that diagram; the spec's",
+            '"Workflow coverage" table records the node-to-component mapping and per-node status.',
+        ]
+    lines += [
         "",
         "## Scripts",
         "",
-        "- `scripts/setup-env.sh` — bootstraps whichever languages got included",
+        "- `scripts/setup-env.sh` — creates one shared `.venv` and installs whichever languages got included",
         "- `scripts/health-check.sh` — smoke-tests each included template's own test suite",
         "- `scripts/sync-templates.sh` — pulls upstream template improvements from the source repo",
         "- `scripts/git-sync-all.sh` — status/push helper across every included worktree branch",
         "- `scripts/repair-worktrees.sh` — run this first if you ever move or rename this folder",
+    ]
+    if wrapper_inited:
+        lines.append(
+            "- `scripts/push-wrapper.sh <remote-url> [branch]` — commit + push this wrapper's own "
+            "glue files (not the worktrees) to a remote"
+        )
+    lines += [
         "",
         "## If you move this folder",
         "",
@@ -384,22 +519,27 @@ def write_claude_md(
     (output / "CLAUDE.md").write_text("\n".join(lines) + "\n")
 
 
-def write_todo(output: Path, selections: list[Selection]) -> None:
+def write_todo(output: Path, selections: list[Selection], wrapper_inited: bool = False) -> None:
+    wrapper_line = (
+        "- [ ] Wrapper git repo is initialised on `main`; push it with "
+        "`scripts/push-wrapper.sh <remote-url>` when you have one"
+        if wrapper_inited else
+        "- [ ] Version-control the wrapper glue (this README, `scripts/`, `*.code-workspace`, `docs/`): "
+        "run `git init` here, or re-generate with `--init-wrapper`. `.gitignore` already excludes "
+        "`.git-store/`, `.venv/`, and `features/` (each worktree keeps its own history in `.git-store/`)"
+    )
     lines = [
         f"# Post-generation todo",
         "",
         "Manual follow-ups this generator can't safely do for you:",
         "",
-        "- [ ] Run `scripts/setup-env.sh` to install each template's dependencies",
+        "- [ ] Run `scripts/setup-env.sh` to create the shared `.venv` and install dependencies",
         "- [ ] Rename the package/project name if `--project-name` was a placeholder",
         "- [ ] Fill in real values for each included template's `.env.example` (if it has one)",
-        "- [ ] If you want to version-control the wrapper files (this README, scripts/, .vscode/) themselves,",
-        "      run `git init` in this folder -- the generated `.gitignore` already excludes `.git-store/`",
-        "      so a wrapper-level `git add .` won't try to commit the bundled bare clone",
-        "- [ ] Each `features/<alias>/` may need its own `.vscode/settings.json` for a per-folder",
-        "      `python.defaultInterpreterPath` once you've created a venv there -- don't set that",
-        "      globally in the top-level `.code-workspace`, it's ambiguous across multiple languages",
-        "- [ ] Set up a remote for this project's own history if you `git init` the wrapper",
+        wrapper_line,
+        "- [ ] The `.code-workspace` points `python.defaultInterpreterPath` at the one shared",
+        "      `${workspaceFolder}/.venv`. If a `features/<alias>/` needs its own interpreter, add",
+        "      `features/<alias>/.vscode/settings.json` with a per-folder path -- don't change the global one",
         "- [ ] Run `scripts/health-check.sh` once dependencies are installed",
         "- [ ] If you move or rename this folder after generation, run `scripts/repair-worktrees.sh`",
         "      first thing -- git worktree links are absolute paths on both ends, so every",
@@ -421,6 +561,11 @@ def write_gitignore(output: Path) -> None:
             "# to a wrapper-level git init, it's a full copy of coding-project-templates' history.",
             ".git-store/",
             "",
+            "# Each features/<name> is a git worktree with its own history in .git-store/.",
+            "# A wrapper-level repo (see scripts/push-wrapper.sh) tracks only the glue files,",
+            "# never the worktrees themselves.",
+            "features/",
+            "",
             ".venv/",
             "node_modules/",
             "__pycache__/",
@@ -430,6 +575,48 @@ def write_gitignore(output: Path) -> None:
             "",
         ])
     )
+
+
+PUSH_WRAPPER_SH = """\
+#!/usr/bin/env bash
+# Commit and push this wrapper's own glue files (scripts/, *.code-workspace,
+# docs/, README.md, CLAUDE.md, todo.md, .workspace-manifest.json) to a remote.
+# The features/<alias> worktrees are NOT pushed from here -- they are gitignored
+# in this repo and have their own history in .git-store/ (push those with
+# scripts/git-sync-all.sh).
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+REMOTE_URL="${1:-}"
+BRANCH="${2:-main}"
+if [ -z "$REMOTE_URL" ]; then
+  echo "usage: scripts/push-wrapper.sh <git-remote-url> [branch]   (default branch: main)" >&2
+  exit 2
+fi
+
+git add -A
+git diff --cached --quiet || git commit -m "wrapper: update workspace glue"
+if git remote get-url wrapper >/dev/null 2>&1; then
+  git remote set-url wrapper "$REMOTE_URL"
+else
+  git remote add wrapper "$REMOTE_URL"
+fi
+git push -u wrapper "HEAD:$BRANCH"
+"""
+
+
+def init_wrapper(output: Path) -> None:
+    """git init the output folder on a 'main' branch and stage the glue files,
+    so the wrapper's own history exists from the start. Uses `symbolic-ref`
+    rather than `git init -b` so it works on git older than 2.28. The
+    features/<alias> worktrees are gitignored here -- each keeps its own
+    history in .git-store/."""
+    push_helper = output / "scripts" / "push-wrapper.sh"
+    push_helper.write_text(PUSH_WRAPPER_SH)
+    push_helper.chmod(push_helper.stat().st_mode | 0o111)
+    run(["git", "-C", str(output), "init", "-q"])
+    run(["git", "-C", str(output), "symbolic-ref", "HEAD", "refs/heads/main"])
+    run(["git", "-C", str(output), "add", "-A"])
 
 
 def copy_scripts(output: Path) -> None:
@@ -453,6 +640,13 @@ def main() -> None:
     p.add_argument("--project-name", help="short project name, used in .code-workspace filename (ignored if --spec given)")
     p.add_argument("--target", choices=VALID_TARGETS, help="wsl2 or windows (ignored if --spec given)")
     p.add_argument("--source-repo", type=Path, default=None, help="path to coding-project-templates (default: auto-detected)")
+    p.add_argument("--workflow", action="append", type=Path, default=None,
+                   help="workflow diagram this workspace derives from; copied into "
+                        "<output>/docs/workflows_diagrams/ and linked from CLAUDE.md. Repeatable. "
+                        "With --spec, the spec's `workflow:` list is used too (paths relative to the spec file).")
+    p.add_argument("--init-wrapper", action="store_true",
+                   help="git init the output folder on a 'main' branch and add scripts/push-wrapper.sh, "
+                        "so the wrapper glue is version-controlled (worktrees stay gitignored there)")
     p.add_argument("--force", action="store_true", help="allow writing into a non-empty output directory")
     p.add_argument("--dry-run", action="store_true", help="print the plan and exit without writing anything")
     args = p.parse_args()
@@ -465,6 +659,10 @@ def main() -> None:
         output = Path(spec["output_path"]).expanduser().resolve()
         project_name = spec["project_name"]
         target = spec["target"]
+        spec_wf = spec.get("workflow") or []
+        if isinstance(spec_wf, str):
+            spec_wf = [spec_wf]
+        workflow_files = [(args.spec.parent / w).expanduser().resolve() for w in spec_wf]
     else:
         if not (args.templates and args.output and args.project_name and args.target):
             raise SystemExit("error: without --spec, --templates, --output, --project-name and --target are all required")
@@ -472,6 +670,16 @@ def main() -> None:
         output = args.output.expanduser().resolve()
         project_name = args.project_name
         target = args.target
+        workflow_files = []
+
+    for w in (args.workflow or []):
+        rw = w.expanduser().resolve()
+        if rw not in workflow_files:
+            workflow_files.append(rw)
+
+    missing = [str(w) for w in workflow_files if not w.is_file()]
+    if missing:
+        raise SystemExit("error: workflow file(s) not found: " + ", ".join(missing))
 
     available = discover_templates(source_repo)
     selections = parse_template_selections(templates_list, available)
@@ -487,6 +695,12 @@ def main() -> None:
             print(f"  - features/{s.alias}  (from {s.template} @ {s.branch})")
         else:
             print(f"  - features/{s.alias}  ({s.branch})")
+    if workflow_files:
+        print("Workflow docs:")
+        for w in workflow_files:
+            print(f"  - {w}")
+    if args.init_wrapper:
+        print("Wrapper:      git init on 'main' + scripts/push-wrapper.sh")
 
     if args.dry_run:
         print("\n--dry-run: nothing written.")
@@ -502,17 +716,26 @@ def main() -> None:
     print("Adding worktrees...")
     commits, branches = add_worktrees(git_store, output, selections)
 
-    print("Writing .vscode, docs, manifest...")
-    ws_path = write_workspace_file(output, project_name, selections, target)
+    print("Writing workspace file, docs, manifest...")
+    workflow_docs = copy_workflow_docs(output, workflow_files) if workflow_files else []
+    ws_path = write_workspace_file(output, project_name, selections, target, has_docs=bool(workflow_docs))
     write_manifest(output, source_repo, selections, commits, branches, target)
     write_readme(output, project_name, selections)
-    write_claude_md(output, project_name, selections, commits, branches, target)
-    write_todo(output, selections)
+    write_claude_md(output, project_name, selections, commits, branches, target,
+                    workflow_docs, args.init_wrapper)
+    write_todo(output, selections, args.init_wrapper)
     write_gitignore(output)
     copy_scripts(output)
 
+    if args.init_wrapper:
+        print("Initialising wrapper git repo (branch: main)...")
+        init_wrapper(output)
+
     print(f"\nDone. Workspace file: {ws_path}")
-    print(f"Next: open {output} in VS Code, then run scripts/setup-env.sh.")
+    nxt = f"open {ws_path.name} in VS Code, then run scripts/setup-env.sh"
+    if args.init_wrapper:
+        nxt += "; push the wrapper with scripts/push-wrapper.sh <remote-url>"
+    print(f"Next: {nxt}.")
 
 
 if __name__ == "__main__":
