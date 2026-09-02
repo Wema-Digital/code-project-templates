@@ -4,7 +4,7 @@ Status: BUILT 2026-08-29 — spec approved, Phases 0–2 done (repo + board + ge
 
 ## Summary
 
-First real use of `vscode-workspace-gen` since Phase 6 closed. Builds the local, multi-worktree workspace for the YouTube keyword-intelligence and production pipeline described in `keyword_pipeline_integration_v8.mermaid` and `YouTube_Pipeline_Ownership_and_Workspace_Map.md`, plus a third component (a Notion.so API integration) confirmed in chat but not yet documented in the ownership map. This file plays two roles at once: it is the `workspace-architect` style spec `generate-workspace.py --spec` will eventually consume, and the broader end-to-end rollout plan (GitHub, content build-out, verification) that sits around it, since this request is bigger than the generator's own four-field spec.
+First real use of `vscode-workspace-gen` since Phase 6 closed. Builds the local, multi-worktree workspace for the YouTube keyword-intelligence and production pipeline described in `keyword_pipeline_integration_v8.mermaid`, plus a third component (a Notion.so API integration) confirmed in chat. The ownership map that earlier drafts referenced as `YouTube_Pipeline_Ownership_and_Workspace_Map.md` was never committed; the canonical node→worktree→status map is now `docs/workflow-coverage.md` in the generated workspace (`/mnt/w/wema-studio/vscode_workspace/docs/workflow-coverage.md`), produced by Phase 2 hardening (e). This file plays two roles at once: it is the `workspace-architect` style spec `generate-workspace.py --spec` will eventually consume, and the broader end-to-end rollout plan (GitHub, content build-out, verification) that sits around it, since this request is bigger than the generator's own four-field spec.
 
 ## Resolved so far (this session's Q&A)
 
