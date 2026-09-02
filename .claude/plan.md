@@ -179,3 +179,33 @@ subprocess.CalledProcessError: ... 'worktree', 'add', '.../features/notion-integ
 **Fix:** `add_worktrees` now creates a per-alias branch for any aliased selection (`s.alias != s.template`, plus a `Counter` guard for a same-branch collision without distinct aliases): `git worktree add -b <alias> <path> <source-branch>`. It returns a second dict `{alias: branch_actually_checked_out}`; `write_manifest` (new `source_branch` key alongside `branch`) and `write_claude_md` (Branch column now shows the per-folder branch; an extra paragraph explains the fork when any occurred) were updated to use it. A plain un-aliased selection is unchanged -- still a straight checkout of its template branch.
 
 **Verified:** clean `py_compile`; regenerated the full six-worktree `youtube-pipeline` spec non-dry-run -- all six worktrees created, each on its own branch matching its folder name (`git worktree list` confirmed), manifest records `branch` + `source_branch` correctly, generated `CLAUDE.md` table + fork paragraph correct, `health-check.sh` exit 0 (all skipped, no deps). All six branches then pushed to `Wema-Digital/youtube-pipeline` and the generated `.git-store` given a `github` remote (kept separate from `origin`, which `sync-templates.sh` needs pointed at the source repo).
+
+---
+
+## Addendum: lessons from the first real rollout (`youtube-pipeline`)
+
+Recorded 2026-09-02, after `youtube-pipeline` reached Phase 2 "Build" (6 worktrees generated, 6 branches pushed) and a hardening pass before Phase 3 content work. Root-repo companion note: `claude/8-Generator hardening from first rollout (youtube-pipeline).md`. Propagation tracked as "Phase 2 hardening (f)" on [Project #3](https://github.com/orgs/Wema-Digital/projects/3).
+
+### The problem
+
+The generated output is not workable as-is — it needs hand-finishing, and the hand-finishing drifts. Concretely, on the first real run:
+
+- **`write_workspace_file()` emits a stub.** Only `.git-store` excludes plus a terminal default profile — no `launch`, no `tasks`, no `python.*` wiring (`defaultInterpreterPath`, `envFile`, `analysis.extraPaths`, `testing.pytestEnabled`, venv PATH prepend). The user hand-edited the file and it drifted into a trailing-comma JSON error, two divergent copies (`<root>/*.code-workspace` vs `<root>/.vscode/*.code-workspace`), and overlapping folder roots.
+- **No environment strategy.** `setup-env.sh` builds a per-worktree `python3 -m venv` for each Python `features/<alias>`. The project wanted one shared `uv` `.venv` at the wrapper root (the model `coding-project-templates` itself uses). The generator has neither a default opinion nor a switch.
+- **The workflow diagram was never an input.** `youtube-pipeline` is built from `keyword_pipeline_integration_v8.mermaid`; neither `generate-workspace.py` nor `workspace-architect` ever saw it, so there is no node→component coverage map and no copy of the diagram in the generated `docs/`.
+- **Spec-referenced docs lived only in chat.** `YouTube_Pipeline_Ownership_and_Workspace_Map.md` is cited throughout the plan and exists nowhere on disk.
+- **The wrapper folder had no git history.** The glue (`.code-workspace`, `scripts/`, `CLAUDE.md`, `docs/`, manifest) was untracked and unpushed — only the 6 template branches were recoverable.
+
+### What will change (not yet done — this addendum is the scope record)
+
+- `scripts/generate-workspace.py::write_workspace_file()` — emit a full settings/launch/tasks block, modelled on the *structure* of the root `coding-project-templates.code-workspace` but `${workspaceFolder}`-relative throughout (never its hardcoded `/mnt/w/...` absolutes). Fix the folder-roots convention to wrapper `.` + one entry per feature + `docs/`. New optional `--workflow <path>` (copy source diagram(s) into generated `docs/workflows_diagrams/`, link from generated `CLAUDE.md`) and `--init-wrapper` (`git init` the output root, seed a `main` branch, write `push-wrapper.sh`).
+- `scripts/setup-env.sh` — default to one shared `uv` `.venv` at the output root (fallback `python3 -m venv` + `pip`), each Python `features/<alias>` installed editable; `--isolated` flag restores the current per-worktree behaviour. Ship the general-purpose `scripts/uv-venv-setup.md` (extracted from the root repo's `scripts/sequence.md`) into generated output.
+- `.claude/agents/workspace-architect.md` — a workflow diagram is an explicit, expected spec input for "workspace from a workflow" requests; the written spec must carry a node→component→status table; any doc the spec references must be committed into this worktree's `claude/` or `docs/`.
+- `CLAUDE.md` — the above as standing rules (shared uv `.venv` default; full non-stub `.code-workspace`; workflow diagram copied + mapped when one drove the build; wrapper gets its own `git init` + `main` branch).
+
+### Verification (to record when the work lands)
+
+- Dry-run generation produces a `.code-workspace` that opens clean on both WSL2 and native Windows with no hand-editing.
+- `setup-env.sh` produces one working shared `.venv`.
+- `workspace-architect`'s spec template includes the node→component table.
+- This addendum updated with the actual diffs and the root `claude/8` note cross-checked.
