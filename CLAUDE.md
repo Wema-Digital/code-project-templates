@@ -4,24 +4,40 @@ This is the **workspace generator** template of the `coding-project-templates` l
 
 ## What this tool does
 
-It builds a standalone, multi-template project folder: you pick which templates from `coding-project-templates` you want (`web-flask` + `python-scripts`, say), and it produces a folder with `.vscode/`, `features/` (one git worktree per selected template), `README.md`, and `scripts/` — ready to open and work in, with no ongoing dependency on this repo's location.
+It builds a standalone, multi-template project folder: you pick which templates from `coding-project-templates` you want (`web-flask` + `python-scripts`, say), and it produces a folder with a root `<project-name>.code-workspace` file, `features/` (one git worktree per selected template), `README.md`, `scripts/`, and — for a workflow-driven build — a `docs/` copy of the source diagram; ready to open and work in, with no ongoing dependency on this repo's location.
 
 ## Two jobs a session opened here might be doing
 
 A Claude Code session in this folder is always doing one of two things, both entered via `/generate-workspace` (see `.claude/commands/generate-workspace.md`). Work out which before doing anything else:
 
 1. **Interviewing** (`/generate-workspace`, no arguments) — no `claude/N-*.md` spec exists yet for what the user wants. The `workspace-architect` subagent drafts the spec and reports back either `NEEDS-INPUT` (questions to put to the user) or `DRAFT-READY`; the main session is the one that actually asks the user, since subagents can't. Once the spec is written to `claude/N-Title.md` in *this worktree's own* `claude/` folder (not the root repo's), **stop there for review** — this mode never generates files itself.
-2. **Generating** (`/generate-workspace claude/N-title.md`) — a reviewed spec already exists. Runs `scripts/generate-workspace.py --spec ...`, which does the actual work: bare-clone, worktrees, `.vscode/`, docs, scripts. This is the only case where anything gets written into the output path.
+2. **Generating** (`/generate-workspace claude/N-title.md`) — a reviewed spec already exists. Runs `scripts/generate-workspace.py --spec ...`, which does the actual work: bare-clone, worktrees, the root `.code-workspace`, docs, scripts. This is the only case where anything gets written into the output path.
 
 Never skip straight to generating from an interview in the same turn — the spec gets written, then reviewed, then built. That gap is deliberate: it is the user's chance to correct a misread requirement before any files exist on disk.
 
 ## Standing rule: check current VS Code docs before finalising settings
 
-Every run, before writing `.vscode/*.code-workspace` settings, check the current VS Code docs for the settings keys in use (`python.defaultInterpreterPath`, `terminal.integrated.*`, etc. drift between releases). This is not a one-time thing done when this template was built — the schema changes over time, so re-verify it live, every generation.
+Every run, before writing the `.code-workspace` settings, check the current VS Code docs for the settings keys in use (`python.defaultInterpreterPath`, `python.testing.*`, `terminal.integrated.*`, etc. drift between releases). This is not a one-time thing done when this template was built — the schema changes over time, so re-verify it live, every generation.
 
 ## Standing rule: ask Windows vs WSL2, but don't rely on it for portability
 
-The generated project's `.vscode/*.code-workspace` needs to work regardless of whether it's opened on native Windows or through WSL2. Ask which one the user's targeting, because a handful of settings genuinely are OS-specific — but the actual portability fix is writing paths as `${workspaceFolder}`-relative wherever the settings schema allows it, not hardcoded absolutes. This repo's own committed workspace file hardcoded a WSL path (`/mnt/w/vscode.workspaces/...`) into several settings and broke the moment someone opened it natively — don't repeat that.
+The generated project's `.code-workspace` needs to work regardless of whether it's opened on native Windows or through WSL2. Ask which one the user's targeting, because a handful of settings genuinely are OS-specific — but the actual portability fix is writing paths as `${workspaceFolder}`-relative wherever the settings schema allows it, not hardcoded absolutes. This repo's own committed workspace file hardcoded a WSL path (`/mnt/w/vscode.workspaces/...`) into several settings and broke the moment someone opened it natively — don't repeat that.
+
+## Standing rule: the generated `.code-workspace` ships complete, at the root
+
+`generate-workspace.py::write_workspace_file()` writes `<output>/<name>.code-workspace`, **not** `<output>/.vscode/` — folder paths in a workspace file resolve relative to the file's own directory, so under `.vscode/` every `features/<alias>` entry points at `.vscode/features/<alias>` and loads broken. The file is not a stub: `folders` (`.` first, then each component, then `docs/` when present), a full `settings` block (`python.defaultInterpreterPath` → the shared `.venv`, `python.envFile`, `python.analysis.extraPaths` + pytest per Python component, terminal PATH prepend), `launch` (debugpy per component), and `tasks` (the setup/health/sync scripts). Model new keys on the *structure* of the root `coding-project-templates.code-workspace`, never its hardcoded absolute paths.
+
+## Standing rule: one shared `.venv`, via uv
+
+The default environment for a generated project is a **single `.venv` at the project root**, every Python component installed into it (`scripts/setup-env.sh`, uv-first). That's what `coding-project-templates` itself does and what the generated `.code-workspace` points at. `setup-env.sh --isolated` is the escape hatch for genuine dependency conflicts — don't reintroduce a per-worktree-venv assumption in the generated settings.
+
+## Standing rule: a workflow-driven build carries its diagram
+
+When the request is "build a workspace from this workflow", the source diagram is a first-class input: it must be committed into this worktree (see `workspace-architect.md`), the spec's `workflow:` key points at it, and `generate-workspace.py --workflow` (or the spec key) copies it into the generated `docs/workflows_diagrams/` and links it from the generated `CLAUDE.md`. The spec also carries a node→component coverage table. Don't let a workflow live only in chat — the first rollout did, and that doc is now lost (`.claude/plan.md`, first-rollout addendum).
+
+## Standing rule: version-control the wrapper
+
+The generated glue (`*.code-workspace`, `scripts/`, `docs/`, `CLAUDE.md`, …) is not covered by the `features/<alias>` worktree histories. `generate-workspace.py --init-wrapper` runs `git init` on the output root on a `main` branch and adds `scripts/push-wrapper.sh`; the `.gitignore` keeps `.git-store/`, `features/`, and `.venv/` out of it. Offer this when generating for real.
 
 ## The bare-clone-then-worktree mechanism
 
@@ -33,24 +49,28 @@ The fix: generate a fresh **bare clone of this repo inside the output folder** (
 
 ```
 <output>/
-├── .git-store/            # bare clone of coding-project-templates — not the live checkout
-├── .vscode/
-│   └── *.code-workspace    # OS-appropriate, ${workspaceFolder}-relative paths
+├── .git-store/                    # bare clone of coding-project-templates — not the live checkout
+├── <project-name>.code-workspace  # at the ROOT, not .vscode/: folder paths resolve relative to
+│                                  #   this file. OS-appropriate, ${workspaceFolder}-relative,
+│                                  #   full settings/launch/tasks (not a stub)
 ├── features/
-│   └── <template>/         # git worktree per selected template, against .git-store
-├── scripts/                 # small, single-purpose — see below, not one monolith
-├── .workspace-manifest.json # which templates + commit/branch went in
-├── .gitignore                # excludes .git-store/ from any wrapper-level git init
+│   └── <alias>/                   # git worktree per selected template, against .git-store
+├── scripts/                       # small, single-purpose — see below, not one monolith
+│   └── push-wrapper.sh            # only with --init-wrapper
+├── docs/workflows_diagrams/       # only with --workflow: copy of the source diagram(s)
+├── .venv/                         # shared env, made by scripts/setup-env.sh (gitignored)
+├── .workspace-manifest.json       # which templates + commit/branch went in
+├── .gitignore                     # keeps .git-store/, features/, .venv/ out of a wrapper git
 ├── README.md
-├── CLAUDE.md                # generated, summarises what's included and how it was assembled
-└── todo.md                  # post-generation checklist: rename package, fill .env, add a remote
+├── CLAUDE.md                      # generated, summarises what's included and how it was assembled
+└── todo.md                        # post-generation checklist: rename package, fill .env, push wrapper
 ```
 
 ## `scripts/` philosophy: small and composable, not one monolith
 
 This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five loosely related things in one file (env file, workspace file, csv, docs generation, debug/task config) and its docs generation is already broken. Don't repeat that shape here. Each generated script does one thing:
 
-- `setup-env.sh` — bootstraps whichever languages actually got included, not a one-size-assumes-Python script
+- `setup-env.sh` — creates one shared root `.venv` (uv-first) and installs whichever languages actually got included, not a one-size-assumes-Python script; `--isolated` for per-worktree envs
 - `git-sync-all.sh` — status/push across every worktree branch in the generated project. The spec called this "reused from phase 2", but phase 2's own `scripts/git-sync-all.sh` was never actually built (its GitHub Project card is still "optional"/in progress) — this is a fresh implementation, not a reuse, written to the same brief
 - `sync-templates.sh` — pulls upstream template improvements from `coding-project-templates` into the generated project's branches after the fact (fast-forward only; a diverged branch is reported, not silently merged)
 - `health-check.sh` — smoke-tests that each included template's own test suite still passes
@@ -68,17 +88,20 @@ This repo already has a cautionary example: `ProjectSetup-linux-os.py` does five
 | `.claude/commands/todo-next.md` | Inherited from `claude-code-advance` — reads `todo.md`, reports the next task |
 | `.claude/agents/doc-sync-checker.md` | Inherited from `claude-code-advance` — checks README/CLAUDE.md/todo.md consistency |
 | `.claude/settings.json` + `.claude/hooks/validate-json.sh` | Inherited — validates `.claude/*.json` still parses after an edit |
-| `scripts/generate-workspace.py` | The core logic: bare-clone, worktrees, `.vscode/`, docs, manifest, copies the scripts below into the output |
-| `scripts/setup-env.sh` | Copied into generated output — bootstraps whichever languages got included |
+| `scripts/generate-workspace.py` | The core logic: bare-clone, worktrees, the root `.code-workspace`, docs (incl. `--workflow` copy), manifest, optional `--init-wrapper`, copies the scripts below into the output |
+| `scripts/setup-env.sh` | Copied into generated output — one shared root `.venv` (uv-first), or `--isolated` per-worktree |
 | `scripts/sync-templates.sh` | Copied into generated output — fast-forwards each included branch from `origin` |
 | `scripts/health-check.sh` | Copied into generated output — smoke-tests each included template's test suite |
 | `scripts/git-sync-all.sh` | Copied into generated output — status/push across every included worktree |
 | `scripts/repair-worktrees.sh` | Copied into generated output — fixes worktree links after the generated project is moved (see below) |
+| `scripts/push-wrapper.sh` | Written into generated output **only with `--init-wrapper`** — commits + pushes the wrapper's own glue files to a remote |
 | `.claude/plan.md` | This template's own construction plan (bare-clone mechanism, output shape, Q&A flow) |
 | `README.md` | What this tool does, the 4-step process, how to invoke it |
 | `CLAUDE.md` | This file |
 
 **Phase 6 complete** (Card 3 executed 2026-08-25 — see `.claude/plan.md`'s Card 3 addendum). Real end-to-end run confirmed: portability by deleting an isolated source copy entirely (not just moving it), both Windows/WSL2 target variants, `scripts/health-check.sh` passing clean against a real generated project, and the workspace file opening in VS Code. Found and fixed two real bugs along the way: three Phase 5 templates' CI was silently broken (missing `pytest.ini` `pythonpath`), and `sync-templates.sh` silently did nothing (`git clone --bare`'s `origin` remote has no fetch refspec by default). **Not done**: a literal live `/generate-workspace` interview through a separate real Claude Code session opened in this worktree — worth a manual pass if maximum confidence is wanted.
+
+**First real rollout** (`youtube-pipeline`, 2026-09) surfaced gaps now fixed here: a stub `.code-workspace` written under `.vscode/`, no shared-`.venv` model, the workflow diagram never a spec input, and a wrapper with no git history. See `.claude/plan.md`'s first-rollout addendum and the root `claude/8-*.md` note.
 
 ## A worktree caveat found while building this: moving a generated project breaks it
 

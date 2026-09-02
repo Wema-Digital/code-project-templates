@@ -16,6 +16,6 @@ Two modes, chosen by whether `$ARGUMENTS` was given. Never do both in one run �
 ## Mode 2: `$ARGUMENTS` is a spec path — build
 
 1. Confirm the file exists (`Read` it) and looks like a reviewed spec — if its `Status:` line still says `draft` rather than `reviewed`, ask the user to confirm they've actually reviewed it before continuing (don't just proceed on the strength of it existing).
-2. Run `python3 scripts/generate-workspace.py --spec "$ARGUMENTS"`. If it fails, report the error plainly — don't retry with guessed fixes.
-3. On success, report the output path and the two things to do next: `cd` into it and run `scripts/setup-env.sh`, then open the `.vscode/*.code-workspace` file it printed.
-4. Remind the user to look at the generated `todo.md` — it lists manual follow-ups the generator can't safely do for them.
+2. Run `python3 scripts/generate-workspace.py --spec "$ARGUMENTS"`. If it fails, report the error plainly — don't retry with guessed fixes. (If the spec carries a `workflow:` key, the diagram it names must exist inside this worktree — the script will error if it doesn't.)
+3. On success, report the output path and the two things to do next: `cd` into it and run `scripts/setup-env.sh` (creates the one shared `.venv`), then open the `<project-name>.code-workspace` file it printed — at the output root, not `.vscode/`.
+4. Remind the user to look at the generated `todo.md` — it lists manual follow-ups the generator can't safely do for them (filling `.env`, and pushing the wrapper if `--init-wrapper` was used).
