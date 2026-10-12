@@ -19,18 +19,25 @@ echo "== Health-checking templates under $FEATURES_DIR =="
 for dir in "$FEATURES_DIR"/*/; do
   name="$(basename "$dir")"
 
-  if [ -f "$dir/.venv/bin/pytest" ] && [ -d "$dir/tests" ]; then
+  # Per-worktree venv (setup-env.sh --isolated) wins; otherwise the shared
+  # root .venv that setup-env.sh builds by default.
+  venv_bin=""
+  if [ -d "$dir/.venv/bin" ]; then venv_bin="$dir/.venv/bin"
+  elif [ -d "$ROOT/.venv/bin" ]; then venv_bin="$ROOT/.venv/bin"
+  fi
+
+  if [ -n "$venv_bin" ] && [ -f "$venv_bin/pytest" ] && [ -d "$dir/tests" ]; then
     echo "-- $name: pytest"
-    if (cd "$dir" && ./.venv/bin/pytest -q); then
+    if (cd "$dir" && "$venv_bin/pytest" -q); then
       echo "   PASS"
     else
       echo "   FAIL"
       FAILED+=("$name")
     fi
 
-  elif [ -f "$dir/.venv/bin/mkdocs" ]; then
+  elif [ -n "$venv_bin" ] && [ -f "$venv_bin/mkdocs" ] && [ -f "$dir/mkdocs.yml" ]; then
     echo "-- $name: mkdocs build --strict"
-    if (cd "$dir" && ./.venv/bin/mkdocs build --strict -q); then
+    if (cd "$dir" && "$venv_bin/mkdocs" build --strict -q); then
       echo "   PASS"
     else
       echo "   FAIL"

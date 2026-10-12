@@ -51,7 +51,13 @@ make_venv() {  # $1 = venv path (no-op if it already exists)
 pip_into() {  # $1 = venv path; rest = pip install args
   local venv="$1"; shift
   if [ "$HAVE_UV" -eq 1 ]; then
-    uv pip install -q --python "$(venv_bindir "$venv")/python" "$@"
+    # Pin resolution to the venv's own X.Y: a user-level uv.toml `[pip]
+    # python-version` otherwise wins over --python and installs wheels built
+    # for the wrong ABI (e.g. cp312 .so files in a 3.13 venv -- import fails).
+    local py pyver
+    py="$(venv_bindir "$venv")/python"
+    pyver="$("$py" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"
+    uv pip install -q --python "$py" --python-version "$pyver" "$@"
   else
     "$(venv_bindir "$venv")/pip" install --quiet "$@"
   fi
@@ -69,6 +75,13 @@ install_python() {  # $1 = component dir, $2 = venv path
   elif [ -f "$dir/requirements.txt" ]; then
     echo "   requirements.txt"
     pip_into "$venv" -r "$dir/requirements.txt"
+  fi
+  # A requirements file alone doesn't install the component's own package --
+  # do that too (editable, no deps: the requirements file owns those), since
+  # an `-e .` inside the file resolves against the cwd, not the file's dir.
+  if [ -f "$dir/pyproject.toml" ] && { [ -f "$dir/requirements-dev.txt" ] || [ -f "$dir/requirements.txt" ]; }; then
+    echo "   pyproject.toml (editable, --no-deps)"
+    pip_into "$venv" --no-deps -e "$dir"
   elif [ -f "$dir/pyproject.toml" ]; then
     echo "   pyproject.toml (editable)"
     pip_into "$venv" -e "$dir[dev]" 2>/dev/null || pip_into "$venv" -e "$dir"
